@@ -199,7 +199,12 @@ class LlmService {
     bool isCheckmate = false,
     String? authHeader,
   }) async {
-    if (!config.enabled || authHeader == null) {
+    // When directMode is false, we use Netlify function which has server-side API key
+    // When directMode is true, we need a client-side API key
+    if (!config.enabled) {
+      return const CommentaryResponse(text: '');
+    }
+    if (config.directMode && authHeader == null) {
       return const CommentaryResponse(text: '');
     }
 
@@ -213,10 +218,10 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
 
     try {
       if (config.directMode) {
-        // Call provider API directly
-        return await _callProviderDirect(personality.systemPrompt, prompt, authHeader);
+        // Call provider API directly (authHeader is guaranteed non-null here due to earlier check)
+        return await _callProviderDirect(personality.systemPrompt, prompt, authHeader!);
       } else {
-        // Call via Netlify function
+        // Call via Netlify function (authHeader can be null - server has its own key)
         return await _callNetlifyFunction(personality.systemPrompt, prompt, variantId, authHeader);
       }
     } catch (e) {
@@ -229,14 +234,19 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
     String personality,
     String prompt,
     String variantId,
-    String authHeader,
+    String? authHeader,
   ) async {
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+    };
+    // Only include auth header if we have a client-side key
+    if (authHeader != null) {
+      headers['Authorization'] = authHeader;
+    }
+
     final response = await _client.post(
       Uri.parse('${config.baseUrl}${config.endpoint}'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': authHeader,
-      },
+      headers: headers,
       body: jsonEncode({
         'provider': config.provider.name,
         'model': config.model,

@@ -12,9 +12,14 @@ class CommentarySpeechBubble extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final commentary = ref.watch(commentaryProvider);
     final auth = ref.watch(authProvider);
+    final llmConfig = ref.watch(llmConfigProvider);
 
-    // Don't show anything if no API key configured
-    if (!auth.isAuthenticated) {
+    // Show commentary if:
+    // - We have a client-side API key (isAuthenticated), OR
+    // - We're in Netlify mode (directMode: false) where server has the API key
+    final canShowCommentary = auth.isAuthenticated || !llmConfig.directMode;
+
+    if (!canShowCommentary) {
       return const SizedBox.shrink();
     }
 

@@ -181,9 +181,13 @@ class GameNotifier extends Notifier<GameState> {
   /// Generate LLM commentary for a move.
   Future<void> _generateCommentary(Move move, Piece piece, Piece? capturedPiece) async {
     final auth = ref.read(authProvider);
-    if (!auth.isAuthenticated) return;
-
     final llmConfig = ref.read(llmConfigProvider);
+
+    // Allow commentary if:
+    // - We have a client-side API key (isAuthenticated), OR
+    // - We're in Netlify mode (directMode: false) where server has the API key
+    if (!auth.isAuthenticated && llmConfig.directMode) return;
+
     if (!llmConfig.enabled) return;
 
     final variant = ref.read(selectedVariantProvider);
