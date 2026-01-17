@@ -1,0 +1,16 @@
+{
+  "provider": "anthropic",
+  "apiKeys": {
+    "anthropic": "",
+    "openai": "",
+    "google": ""
+  },
+  "models": {
+    "anthropic": "claude-3-haiku-20240307",
+    "openai": "gpt-4o-mini",
+    "google": "gemini-1.5-flash"
+  },
+  "apiBaseUrl": "/.netlify/functions",
+  "directMode": false,
+  "commentaryEnabled": true
+}

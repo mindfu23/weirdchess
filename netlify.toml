@@ -1,0 +1,27 @@
+[build]
+  # Pre-built Flutter web output
+  publish = "build/web"
+  # No build command - files are pre-built
+  command = "echo 'Using pre-built Flutter web files'"
+  # Functions directory
+  functions = "netlify/functions"
+
+# Redirects for SPA routing (exclude static assets and functions)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Headers for CORS
+[[headers]]
+  for = "/.netlify/functions/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+
+# Development settings
+[dev]
+  publish = "build/web"
+  port = 8888
+  autoLaunch = true

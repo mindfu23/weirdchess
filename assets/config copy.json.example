@@ -1,0 +1,5 @@
+{
+  "apiKey": "your-anthropic-api-key-here",
+  "apiBaseUrl": "/.netlify/functions",
+  "commentaryEnabled": true
+}
