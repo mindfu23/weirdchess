@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 import '../core/move.dart';
@@ -8,8 +10,6 @@ import 'config_service.dart';
 /// Configuration for LLM API endpoints.
 class LlmConfig {
   /// Base URL for API calls.
-  /// For local dev: 'http://localhost:8888/.netlify/functions'
-  /// For Netlify: '/.netlify/functions' (relative)
   final String baseUrl;
 
   /// Endpoint path for chat completions.
@@ -25,8 +25,13 @@ class LlmConfig {
   final bool enabled;
 
   /// Whether to call the provider API directly (bypasses Netlify function).
-  /// Useful for local development.
   final bool directMode;
+
+  /// Maximum number of retry attempts for failed API calls.
+  final int maxRetries;
+
+  /// Maximum tokens for response.
+  final int maxTokens;
 
   const LlmConfig({
     this.baseUrl = '/.netlify/functions',
@@ -34,7 +39,9 @@ class LlmConfig {
     this.provider = LlmProvider.anthropic,
     this.model = 'claude-3-haiku-20240307',
     this.enabled = true,
-    this.directMode = true, // Default to direct mode for easier local dev
+    this.directMode = true,
+    this.maxRetries = 3,
+    this.maxTokens = 200,
   });
 
   LlmConfig copyWith({
@@ -44,6 +51,8 @@ class LlmConfig {
     String? model,
     bool? enabled,
     bool? directMode,
+    int? maxRetries,
+    int? maxTokens,
   }) {
     return LlmConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -52,6 +61,8 @@ class LlmConfig {
       model: model ?? this.model,
       enabled: enabled ?? this.enabled,
       directMode: directMode ?? this.directMode,
+      maxRetries: maxRetries ?? this.maxRetries,
+      maxTokens: maxTokens ?? this.maxTokens,
     );
   }
 }
@@ -145,6 +156,19 @@ Keep commentary to 1-2 sentences. Be dramatic but not silly.''',
     ],
   );
 
+  static const standardChess = VariantPersonality(
+    variantId: 'standard_chess',
+    name: 'Classical Commentator',
+    systemPrompt: '''You are a classical chess commentator with deep appreciation for the game.
+Your tone is knowledgeable and engaging. Reference famous games and players when relevant.
+Keep commentary to 1-2 sentences. Use proper chess terminology.''',
+    examplePhrases: [
+      'A solid developing move.',
+      'The center is contested fiercely.',
+      'Reminiscent of the great masters.',
+    ],
+  );
+
   static VariantPersonality forVariant(String variantId) {
     switch (variantId) {
       case 'grand_chess':
@@ -157,6 +181,8 @@ Keep commentary to 1-2 sentences. Be dramatic but not silly.''',
         return hyderabadChess;
       case 'jetan':
         return jetan;
+      case 'standard_chess':
+        return standardChess;
       default:
         return grandChess; // Default fallback
     }
@@ -167,14 +193,16 @@ Keep commentary to 1-2 sentences. Be dramatic but not silly.''',
 class CommentaryResponse {
   final String text;
   final bool isError;
+  final int? retryCount;
 
   const CommentaryResponse({
     required this.text,
     this.isError = false,
+    this.retryCount,
   });
 
-  factory CommentaryResponse.error(String message) {
-    return CommentaryResponse(text: message, isError: true);
+  factory CommentaryResponse.error(String message, {int? retryCount}) {
+    return CommentaryResponse(text: message, isError: true, retryCount: retryCount);
   }
 }
 
@@ -188,7 +216,7 @@ class LlmService {
     this.config = const LlmConfig(),
   }) : _client = client ?? http.Client();
 
-  /// Generate commentary for a move.
+  /// Generate commentary for a move with retry logic.
   Future<CommentaryResponse> generateCommentary({
     required String variantId,
     required Move move,
@@ -199,8 +227,6 @@ class LlmService {
     bool isCheckmate = false,
     String? authHeader,
   }) async {
-    // When directMode is false, we use Netlify function which has server-side API key
-    // When directMode is true, we need a client-side API key
     if (!config.enabled) {
       return const CommentaryResponse(text: '');
     }
@@ -210,23 +236,67 @@ class LlmService {
 
     final personality = VariantPersonalities.forVariant(variantId);
     final colorName = color == PieceColor.white ? 'White' : 'Black';
-    final moveDesc = _describMove(move, piece, capturedPiece, isCheck, isCheckmate);
+    final moveDesc = _describeMove(move, piece, capturedPiece, isCheck, isCheckmate);
 
     final prompt = '''$colorName played: $moveDesc
 
 Generate a brief (1-2 sentence) commentary on this move in character.''';
 
-    try {
-      if (config.directMode) {
-        // Call provider API directly (authHeader is guaranteed non-null here due to earlier check)
-        return await _callProviderDirect(personality.systemPrompt, prompt, authHeader!);
-      } else {
-        // Call via Netlify function (authHeader can be null - server has its own key)
-        return await _callNetlifyFunction(personality.systemPrompt, prompt, variantId, authHeader);
+    // Retry with exponential backoff
+    int attempt = 0;
+    Duration delay = const Duration(milliseconds: 500);
+
+    while (attempt < config.maxRetries) {
+      try {
+        final response = config.directMode
+            ? await _callProviderDirect(personality.systemPrompt, prompt, authHeader!)
+            : await _callNetlifyFunction(personality.systemPrompt, prompt, variantId, authHeader);
+
+        if (!response.isError) {
+          return response;
+        }
+
+        // Check if error is retryable
+        if (_isRetryableError(response.text)) {
+          attempt++;
+          if (attempt < config.maxRetries) {
+            debugPrint('LLM API call failed (attempt $attempt/${config.maxRetries}), retrying in ${delay.inMilliseconds}ms');
+            await Future.delayed(delay);
+            delay *= 2; // Exponential backoff
+            continue;
+          }
+        }
+
+        return CommentaryResponse.error(response.text, retryCount: attempt);
+      } catch (e) {
+        attempt++;
+        if (attempt < config.maxRetries && _isRetryableException(e)) {
+          debugPrint('LLM API exception (attempt $attempt/${config.maxRetries}): $e');
+          await Future.delayed(delay);
+          delay *= 2;
+          continue;
+        }
+        return CommentaryResponse.error('Connection error: $e', retryCount: attempt);
       }
-    } catch (e) {
-      return CommentaryResponse.error('Connection error: $e');
     }
+
+    return CommentaryResponse.error('Max retries exceeded', retryCount: attempt);
+  }
+
+  /// Check if an error response is retryable.
+  bool _isRetryableError(String errorText) {
+    final retryableCodes = ['429', '500', '502', '503', '504', 'timeout', 'rate limit'];
+    final lowerError = errorText.toLowerCase();
+    return retryableCodes.any((code) => lowerError.contains(code));
+  }
+
+  /// Check if an exception is retryable.
+  bool _isRetryableException(dynamic e) {
+    final errorStr = e.toString().toLowerCase();
+    return errorStr.contains('timeout') ||
+        errorStr.contains('connection') ||
+        errorStr.contains('socket') ||
+        errorStr.contains('network');
   }
 
   /// Call the Netlify function endpoint.
@@ -239,7 +309,6 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
     final headers = <String, String>{
       'Content-Type': 'application/json',
     };
-    // Only include auth header if we have a client-side key
     if (authHeader != null) {
       headers['Authorization'] = authHeader;
     }
@@ -253,12 +322,15 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
         'personality': personality,
         'prompt': prompt,
         'variantId': variantId,
+        'maxTokens': config.maxTokens,
       }),
-    );
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       return CommentaryResponse(text: data['commentary'] ?? '');
+    } else if (response.statusCode == 429) {
+      return CommentaryResponse.error('Rate limit exceeded (429)');
     } else {
       return CommentaryResponse.error('API error: ${response.statusCode}');
     }
@@ -270,7 +342,6 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
     String prompt,
     String authHeader,
   ) async {
-    // Extract API key from Bearer token
     final apiKey = authHeader.startsWith('Bearer ')
         ? authHeader.substring(7)
         : authHeader;
@@ -299,13 +370,13 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
       },
       body: jsonEncode({
         'model': config.model,
-        'max_tokens': 150,
+        'max_tokens': config.maxTokens,
         'system': personality,
         'messages': [
           {'role': 'user', 'content': prompt},
         ],
       }),
-    );
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -314,11 +385,17 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
         return CommentaryResponse(text: content[0]['text'] ?? '');
       }
       return const CommentaryResponse(text: '');
+    } else if (response.statusCode == 429) {
+      return CommentaryResponse.error('Rate limit exceeded (429)');
     } else {
-      final error = jsonDecode(response.body);
-      return CommentaryResponse.error(
-        'Anthropic error: ${error['error']?['message'] ?? response.statusCode}',
-      );
+      try {
+        final error = jsonDecode(response.body);
+        return CommentaryResponse.error(
+          'Anthropic error: ${error['error']?['message'] ?? response.statusCode}',
+        );
+      } catch (_) {
+        return CommentaryResponse.error('Anthropic error: ${response.statusCode}');
+      }
     }
   }
 
@@ -335,13 +412,13 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
       },
       body: jsonEncode({
         'model': config.model,
-        'max_tokens': 150,
+        'max_tokens': config.maxTokens,
         'messages': [
           {'role': 'system', 'content': personality},
           {'role': 'user', 'content': prompt},
         ],
       }),
-    );
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -352,6 +429,8 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
         );
       }
       return const CommentaryResponse(text: '');
+    } else if (response.statusCode == 429) {
+      return CommentaryResponse.error('Rate limit exceeded (429)');
     } else {
       return CommentaryResponse.error('OpenAI error: ${response.statusCode}');
     }
@@ -376,9 +455,9 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
             ],
           },
         ],
-        'generationConfig': {'maxOutputTokens': 150},
+        'generationConfig': {'maxOutputTokens': config.maxTokens},
       }),
-    );
+    ).timeout(const Duration(seconds: 30));
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
@@ -390,12 +469,14 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
         }
       }
       return const CommentaryResponse(text: '');
+    } else if (response.statusCode == 429) {
+      return CommentaryResponse.error('Rate limit exceeded (429)');
     } else {
       return CommentaryResponse.error('Google error: ${response.statusCode}');
     }
   }
 
-  String _describMove(
+  String _describeMove(
     Move move,
     Piece piece,
     Piece? capturedPiece,
@@ -432,8 +513,9 @@ class LlmConfigNotifier extends Notifier<LlmConfig> {
   void setModel(String model) => state = state.copyWith(model: model);
   void setProvider(LlmProvider provider) => state = state.copyWith(provider: provider);
   void setDirectMode(bool directMode) => state = state.copyWith(directMode: directMode);
+  void setMaxRetries(int maxRetries) => state = state.copyWith(maxRetries: maxRetries);
+  void setMaxTokens(int maxTokens) => state = state.copyWith(maxTokens: maxTokens);
 
-  /// Set provider and its default model.
   void setProviderWithModel(LlmProvider provider, String? model) {
     state = state.copyWith(
       provider: provider,
@@ -446,7 +528,6 @@ final llmConfigProvider = NotifierProvider<LlmConfigNotifier, LlmConfig>(
   LlmConfigNotifier.new,
 );
 
-/// Provider for the LLM service.
 final llmServiceProvider = Provider<LlmService>((ref) {
   final config = ref.watch(llmConfigProvider);
   return LlmService(config: config);

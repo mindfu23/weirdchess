@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'board.dart';
 import 'move.dart';
 import 'piece.dart';
@@ -11,19 +12,47 @@ enum GameResult {
   stalemate,
 }
 
+extension GameResultExtension on GameResult {
+  String get pgnResult {
+    switch (this) {
+      case GameResult.whiteWins:
+        return '1-0';
+      case GameResult.blackWins:
+        return '0-1';
+      case GameResult.draw:
+      case GameResult.stalemate:
+        return '1/2-1/2';
+      case GameResult.ongoing:
+        return '*';
+    }
+  }
+}
+
 /// Represents a move with captured piece information for undo
 class MoveRecord {
   final Move move;
   final Piece? capturedPiece;
   final Position? previousEnPassant;
   final bool pieceHadMoved;
+  final String? pieceName;
 
   MoveRecord({
     required this.move,
     this.capturedPiece,
     this.previousEnPassant,
     required this.pieceHadMoved,
+    this.pieceName,
   });
+
+  Map<String, dynamic> toJson() => {
+    'from': '${move.from.row},${move.from.col}',
+    'to': '${move.to.row},${move.to.col}',
+    'isCapture': move.isCapture,
+    'isCastling': move.isCastling,
+    'isEnPassant': move.isEnPassant,
+    'promotionPiece': move.promotionPiece,
+    'pieceName': pieceName,
+  };
 }
 
 /// Manages the complete state of a chess game
@@ -38,6 +67,13 @@ class GameState {
   int halfMoveClock; // For 50-move rule
   int fullMoveNumber;
 
+  // Game metadata for PGN
+  String? event;
+  String? site;
+  String? date;
+  String? whitePlayer;
+  String? blackPlayer;
+
   GameState({
     required this.board,
     required this.variantName,
@@ -48,6 +84,11 @@ class GameState {
     this.result = GameResult.ongoing,
     this.halfMoveClock = 0,
     this.fullMoveNumber = 1,
+    this.event,
+    this.site,
+    this.date,
+    this.whitePlayer,
+    this.blackPlayer,
   })  : moveHistory = moveHistory ?? [],
         whiteCaptured = whiteCaptured ?? [],
         blackCaptured = blackCaptured ?? [];
@@ -59,7 +100,7 @@ class GameState {
 
     final legalMoves = piece.getLegalMoves(board, move.from);
     final legalMove = legalMoves.firstWhere(
-      (m) => m.to == move.to,
+      (m) => m.to == move.to && (move.promotionPiece == null || m.promotionPiece == move.promotionPiece),
       orElse: () => move,
     );
 
@@ -72,6 +113,7 @@ class GameState {
       capturedPiece: capturedPiece,
       previousEnPassant: board.enPassantTarget,
       pieceHadMoved: piece.hasMoved,
+      pieceName: piece.name,
     );
 
     // Track captured pieces
@@ -171,16 +213,13 @@ class GameState {
 
     if (legalMoves.isEmpty) {
       if (board.isInCheck(currentTurn)) {
-        // Checkmate
         result = currentTurn == PieceColor.white
             ? GameResult.blackWins
             : GameResult.whiteWins;
       } else {
-        // Stalemate
         result = GameResult.stalemate;
       }
     } else if (halfMoveClock >= 100) {
-      // 50-move rule
       result = GameResult.draw;
     } else if (_isInsufficientMaterial()) {
       result = GameResult.draw;
@@ -192,10 +231,8 @@ class GameState {
     final whitePieces = board.getPieces(PieceColor.white);
     final blackPieces = board.getPieces(PieceColor.black);
 
-    // King vs King
     if (whitePieces.length == 1 && blackPieces.length == 1) return true;
 
-    // King + minor piece vs King
     if (whitePieces.length == 1 && blackPieces.length == 2) {
       final piece = blackPieces.firstWhere((p) => p.$2.symbol != 'K').$2;
       if (piece.symbol == 'N' || piece.symbol == 'B') return true;
@@ -221,6 +258,171 @@ class GameState {
     return buffer.toString().trim();
   }
 
+  /// Export position to FEN-like notation (extended for 10x10 boards).
+  String toFEN() {
+    final buffer = StringBuffer();
+
+    // Board position
+    for (int row = 0; row < board.size; row++) {
+      int emptyCount = 0;
+      for (int col = 0; col < board.size; col++) {
+        final piece = board.getPiece(Position(row, col));
+        if (piece == null) {
+          emptyCount++;
+        } else {
+          if (emptyCount > 0) {
+            buffer.write(emptyCount);
+            emptyCount = 0;
+          }
+          final symbol = piece.color == PieceColor.white
+              ? piece.symbol.toUpperCase()
+              : piece.symbol.toLowerCase();
+          buffer.write(symbol);
+        }
+      }
+      if (emptyCount > 0) {
+        buffer.write(emptyCount);
+      }
+      if (row < board.size - 1) {
+        buffer.write('/');
+      }
+    }
+
+    // Active color
+    buffer.write(' ');
+    buffer.write(currentTurn == PieceColor.white ? 'w' : 'b');
+
+    // Castling availability (simplified - just check if king/rooks have moved)
+    buffer.write(' ');
+    String castling = '';
+    final whiteKingPos = board.findKing(PieceColor.white);
+    if (whiteKingPos != null) {
+      final whiteKing = board.getPiece(whiteKingPos);
+      if (whiteKing != null && !whiteKing.hasMoved) {
+        final kingsideRook = board.getPiece(Position(board.size - 1, board.size - 1));
+        final queensideRook = board.getPiece(Position(board.size - 1, 0));
+        if (kingsideRook != null && !kingsideRook.hasMoved) castling += 'K';
+        if (queensideRook != null && !queensideRook.hasMoved) castling += 'Q';
+      }
+    }
+    final blackKingPos = board.findKing(PieceColor.black);
+    if (blackKingPos != null) {
+      final blackKing = board.getPiece(blackKingPos);
+      if (blackKing != null && !blackKing.hasMoved) {
+        final kingsideRook = board.getPiece(Position(0, board.size - 1));
+        final queensideRook = board.getPiece(Position(0, 0));
+        if (kingsideRook != null && !kingsideRook.hasMoved) castling += 'k';
+        if (queensideRook != null && !queensideRook.hasMoved) castling += 'q';
+      }
+    }
+    buffer.write(castling.isEmpty ? '-' : castling);
+
+    // En passant target
+    buffer.write(' ');
+    if (board.enPassantTarget != null) {
+      buffer.write(board.enPassantTarget!.toAlgebraic(board.size));
+    } else {
+      buffer.write('-');
+    }
+
+    // Half-move clock and full-move number
+    buffer.write(' $halfMoveClock $fullMoveNumber');
+
+    return buffer.toString();
+  }
+
+  /// Export game to PGN format.
+  String toPGN() {
+    final buffer = StringBuffer();
+
+    // Headers
+    buffer.writeln('[Event "${event ?? "Casual Game"}"]');
+    buffer.writeln('[Site "${site ?? "WeirdChess App"}"]');
+    buffer.writeln('[Date "${date ?? _formatDate(DateTime.now())}"]');
+    buffer.writeln('[Variant "$variantName"]');
+    buffer.writeln('[White "${whitePlayer ?? "Player 1"}"]');
+    buffer.writeln('[Black "${blackPlayer ?? "Player 2"}"]');
+    buffer.writeln('[Result "${result.pgnResult}"]');
+    buffer.writeln('[BoardSize "${board.size}x${board.size}"]');
+    buffer.writeln();
+
+    // Moves
+    final moves = StringBuffer();
+    for (int i = 0; i < moveHistory.length; i++) {
+      if (i % 2 == 0) {
+        moves.write('${(i ~/ 2) + 1}. ');
+      }
+
+      final record = moveHistory[i];
+      final move = record.move;
+
+      // Build move notation
+      String notation = '';
+      if (move.isCastling) {
+        notation = move.to.col > move.from.col ? 'O-O' : 'O-O-O';
+      } else {
+        // Piece symbol (skip for pawns)
+        final pieceName = record.pieceName ?? 'Pawn';
+        if (pieceName != 'Pawn') {
+          notation += pieceName[0];
+        }
+        // Capture indicator
+        if (move.isCapture) {
+          if (pieceName == 'Pawn') {
+            notation += move.from.toAlgebraic(board.size)[0];
+          }
+          notation += 'x';
+        }
+        // Destination
+        notation += move.to.toAlgebraic(board.size);
+        // Promotion
+        if (move.promotionPiece != null) {
+          notation += '=${move.promotionPiece}';
+        }
+      }
+
+      moves.write('$notation ');
+
+      // Line wrap at 80 chars
+      if (moves.length > 70 && i % 2 == 1) {
+        buffer.writeln(moves.toString().trim());
+        moves.clear();
+      }
+    }
+
+    if (moves.isNotEmpty) {
+      buffer.write(moves.toString().trim());
+    }
+
+    buffer.write(' ${result.pgnResult}');
+
+    return buffer.toString();
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
+  }
+
+  /// Serialize game state to JSON for saving.
+  String toJson() {
+    return jsonEncode({
+      'variantName': variantName,
+      'boardSize': board.size,
+      'currentTurn': currentTurn.name,
+      'result': result.name,
+      'halfMoveClock': halfMoveClock,
+      'fullMoveNumber': fullMoveNumber,
+      'fen': toFEN(),
+      'moveHistory': moveHistory.map((r) => r.toJson()).toList(),
+      'event': event,
+      'site': site,
+      'date': date,
+      'whitePlayer': whitePlayer,
+      'blackPlayer': blackPlayer,
+      'savedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
   /// Create a copy of the game state
   GameState copy() {
     return GameState(
@@ -233,6 +435,11 @@ class GameState {
       result: result,
       halfMoveClock: halfMoveClock,
       fullMoveNumber: fullMoveNumber,
+      event: event,
+      site: site,
+      date: date,
+      whitePlayer: whitePlayer,
+      blackPlayer: blackPlayer,
     );
   }
 

@@ -4,6 +4,7 @@ import '../core/move.dart';
 import '../core/piece.dart';
 import '../engine/ai_opponent.dart';
 import '../variants/variant_base.dart';
+import '../variants/standard_chess.dart';
 import '../variants/grand_chess.dart';
 import '../variants/hyderabad_chess.dart';
 import '../variants/jetan.dart';
@@ -15,6 +16,7 @@ import 'auth_service.dart';
 /// Available variants
 final variantsProvider = Provider<List<ChessVariant>>((ref) {
   return [
+    StandardChess(),
     GrandChess(),
     OmegaChess(),
     DecimalChess(),

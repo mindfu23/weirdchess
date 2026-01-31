@@ -5,10 +5,75 @@ import '../core/piece.dart';
 
 /// Position evaluation for the AI
 class Evaluator {
-  // Piece-square tables for positional bonuses (10x10 board)
-  // Values are from white's perspective, flip for black
+  // Piece-square tables for 8x8 boards (standard chess)
+  static const List<List<double>> pawnTable8 = [
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
+    [0.1, 0.1, 0.2, 0.3, 0.3, 0.2, 0.1, 0.1],
+    [0.05, 0.05, 0.1, 0.25, 0.25, 0.1, 0.05, 0.05],
+    [0.0, 0.0, 0.0, 0.2, 0.2, 0.0, 0.0, 0.0],
+    [0.05, -0.05, -0.1, 0.0, 0.0, -0.1, -0.05, 0.05],
+    [0.05, 0.1, 0.1, -0.2, -0.2, 0.1, 0.1, 0.05],
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+  ];
 
-  static const List<List<double>> pawnTable = [
+  static const List<List<double>> knightTable8 = [
+    [-0.5, -0.4, -0.3, -0.3, -0.3, -0.3, -0.4, -0.5],
+    [-0.4, -0.2, 0.0, 0.0, 0.0, 0.0, -0.2, -0.4],
+    [-0.3, 0.0, 0.1, 0.15, 0.15, 0.1, 0.0, -0.3],
+    [-0.3, 0.05, 0.15, 0.2, 0.2, 0.15, 0.05, -0.3],
+    [-0.3, 0.0, 0.15, 0.2, 0.2, 0.15, 0.0, -0.3],
+    [-0.3, 0.05, 0.1, 0.15, 0.15, 0.1, 0.05, -0.3],
+    [-0.4, -0.2, 0.0, 0.05, 0.05, 0.0, -0.2, -0.4],
+    [-0.5, -0.4, -0.3, -0.3, -0.3, -0.3, -0.4, -0.5],
+  ];
+
+  static const List<List<double>> bishopTable8 = [
+    [-0.2, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.2],
+    [-0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.1],
+    [-0.1, 0.0, 0.05, 0.1, 0.1, 0.05, 0.0, -0.1],
+    [-0.1, 0.05, 0.05, 0.1, 0.1, 0.05, 0.05, -0.1],
+    [-0.1, 0.0, 0.1, 0.1, 0.1, 0.1, 0.0, -0.1],
+    [-0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, -0.1],
+    [-0.1, 0.05, 0.0, 0.0, 0.0, 0.0, 0.05, -0.1],
+    [-0.2, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.2],
+  ];
+
+  static const List<List<double>> rookTable8 = [
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    [0.05, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.05],
+    [-0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.05],
+    [-0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.05],
+    [-0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.05],
+    [-0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.05],
+    [-0.05, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.05],
+    [0.0, 0.0, 0.0, 0.05, 0.05, 0.0, 0.0, 0.0],
+  ];
+
+  static const List<List<double>> queenTable8 = [
+    [-0.2, -0.1, -0.1, -0.05, -0.05, -0.1, -0.1, -0.2],
+    [-0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.1],
+    [-0.1, 0.0, 0.05, 0.05, 0.05, 0.05, 0.0, -0.1],
+    [-0.05, 0.0, 0.05, 0.05, 0.05, 0.05, 0.0, -0.05],
+    [0.0, 0.0, 0.05, 0.05, 0.05, 0.05, 0.0, -0.05],
+    [-0.1, 0.05, 0.05, 0.05, 0.05, 0.05, 0.0, -0.1],
+    [-0.1, 0.0, 0.05, 0.0, 0.0, 0.0, 0.0, -0.1],
+    [-0.2, -0.1, -0.1, -0.05, -0.05, -0.1, -0.1, -0.2],
+  ];
+
+  static const List<List<double>> kingMiddleGameTable8 = [
+    [-0.3, -0.4, -0.4, -0.5, -0.5, -0.4, -0.4, -0.3],
+    [-0.3, -0.4, -0.4, -0.5, -0.5, -0.4, -0.4, -0.3],
+    [-0.3, -0.4, -0.4, -0.5, -0.5, -0.4, -0.4, -0.3],
+    [-0.3, -0.4, -0.4, -0.5, -0.5, -0.4, -0.4, -0.3],
+    [-0.2, -0.3, -0.3, -0.4, -0.4, -0.3, -0.3, -0.2],
+    [-0.1, -0.2, -0.2, -0.2, -0.2, -0.2, -0.2, -0.1],
+    [0.2, 0.2, 0.0, 0.0, 0.0, 0.0, 0.2, 0.2],
+    [0.2, 0.3, 0.1, 0.0, 0.0, 0.1, 0.3, 0.2],
+  ];
+
+  // Piece-square tables for 10x10 boards (variants)
+  static const List<List<double>> pawnTable10 = [
     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
     [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
     [0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4],
@@ -21,7 +86,7 @@ class Evaluator {
     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
   ];
 
-  static const List<List<double>> knightTable = [
+  static const List<List<double>> knightTable10 = [
     [-0.5, -0.4, -0.3, -0.3, -0.3, -0.3, -0.3, -0.3, -0.4, -0.5],
     [-0.4, -0.2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.2, -0.4],
     [-0.3, 0.0, 0.1, 0.15, 0.15, 0.15, 0.15, 0.1, 0.0, -0.3],
@@ -34,7 +99,7 @@ class Evaluator {
     [-0.5, -0.4, -0.3, -0.3, -0.3, -0.3, -0.3, -0.3, -0.4, -0.5],
   ];
 
-  static const List<List<double>> bishopTable = [
+  static const List<List<double>> bishopTable10 = [
     [-0.2, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.2],
     [-0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -0.1],
     [-0.1, 0.0, 0.05, 0.1, 0.1, 0.1, 0.1, 0.05, 0.0, -0.1],
@@ -47,7 +112,7 @@ class Evaluator {
     [-0.2, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.1, -0.2],
   ];
 
-  static const List<List<double>> kingMiddleGameTable = [
+  static const List<List<double>> kingMiddleGameTable10 = [
     [-0.3, -0.4, -0.4, -0.5, -0.5, -0.5, -0.5, -0.4, -0.4, -0.3],
     [-0.3, -0.4, -0.4, -0.5, -0.5, -0.5, -0.5, -0.4, -0.4, -0.3],
     [-0.3, -0.4, -0.4, -0.5, -0.5, -0.5, -0.5, -0.4, -0.4, -0.3],
@@ -95,33 +160,55 @@ class Evaluator {
 
   double _evaluatePiece(Piece piece, Position pos, PieceColor color, Board board) {
     double score = piece.value.toDouble();
+    final is8x8 = board.size == 8;
 
     // Add positional bonus
     final row = color == PieceColor.white ? pos.row : (board.size - 1 - pos.row);
     final col = pos.col;
 
     // Clamp indices for safety
-    final safeRow = row.clamp(0, 9);
-    final safeCol = col.clamp(0, 9);
+    final maxIdx = board.size - 1;
+    final safeRow = row.clamp(0, maxIdx);
+    final safeCol = col.clamp(0, maxIdx);
 
     switch (piece.symbol) {
       case 'P':
-        score += pawnTable[safeRow][safeCol];
+        score += is8x8
+            ? pawnTable8[safeRow][safeCol]
+            : pawnTable10[safeRow][safeCol];
         break;
       case 'N':
-        score += knightTable[safeRow][safeCol];
+        score += is8x8
+            ? knightTable8[safeRow][safeCol]
+            : knightTable10[safeRow][safeCol];
         break;
       case 'B':
-        score += bishopTable[safeRow][safeCol];
+        score += is8x8
+            ? bishopTable8[safeRow][safeCol]
+            : bishopTable10[safeRow][safeCol];
+        break;
+      case 'R':
+        if (is8x8) score += rookTable8[safeRow][safeCol];
+        break;
+      case 'Q':
+        if (is8x8) score += queenTable8[safeRow][safeCol];
         break;
       case 'K':
-        score += kingMiddleGameTable[safeRow][safeCol];
+        score += is8x8
+            ? kingMiddleGameTable8[safeRow][safeCol]
+            : kingMiddleGameTable10[safeRow][safeCol];
         break;
       case 'M': // Marshal - encourage central placement
-        score += knightTable[safeRow][safeCol] * 0.5;
+        final knightT = is8x8 ? knightTable8 : knightTable10;
+        score += knightT[safeRow][safeCol] * 0.5;
         break;
       case 'C': // Cardinal - encourage central placement
-        score += bishopTable[safeRow][safeCol] * 0.5;
+        final bishopT = is8x8 ? bishopTable8 : bishopTable10;
+        score += bishopT[safeRow][safeCol] * 0.5;
+        break;
+      case 'A': // Amazon (Zurafa)
+        final knightT = is8x8 ? knightTable8 : knightTable10;
+        score += knightT[safeRow][safeCol] * 0.3;
         break;
     }
 

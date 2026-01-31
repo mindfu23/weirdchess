@@ -49,58 +49,22 @@ No castling in Grand Chess.
   Board createInitialBoard() {
     final board = Board(size: 10);
 
-    // White pieces (rows 8-9 in 0-indexed, so ranks 1-2)
-    // Row 9 (rank 1): R N B Q K B N R (empty corners)
-    _placePiece(board, 9, 0, Rook(color: PieceColor.white));
-    _placePiece(board, 9, 1, Knight(color: PieceColor.white));
-    _placePiece(board, 9, 2, Bishop(color: PieceColor.white));
-    _placePiece(board, 9, 3, Queen(color: PieceColor.white));
-    _placePiece(board, 9, 4, King(color: PieceColor.white));
-    _placePiece(board, 9, 5, King(color: PieceColor.white)); // Placeholder - fix below
-    _placePiece(board, 9, 6, Bishop(color: PieceColor.white));
-    _placePiece(board, 9, 7, Knight(color: PieceColor.white));
-    _placePiece(board, 9, 8, Rook(color: PieceColor.white));
-
-    // Actually, Grand Chess setup is different. Let me fix this:
-    // Rank 1 (row 9): empty, empty, R, empty, empty, empty, empty, R, empty, empty
-    // Rank 2 (row 8): empty, N, B, Q, K, empty, B, N, empty
-    // Rank 3 (row 7): Pawns
-    // Plus Marshal and Cardinal on rank 2
-
-    // Clear and redo properly
-    board.clear();
-
-    // Grand Chess standard setup:
-    // Rank 1 (bottom, row 9): _ _ R _ _ _ _ R _ _ (Rooks on c1 and h1)
-    // Rank 2 (row 8): _ N B Q K _ B N _ (+ M on b2, C on i2, or similar)
-    // Actually the standard setup has:
-    // Rank 1: R on a1 and j1, but wait - let me look at the actual setup
-
-    // Standard Grand Chess setup:
+    // Grand Chess standard setup (chessvariants.com):
+    // Rank 1 (row 9): R . . . . . . . . R (Rooks in corners)
+    // Rank 2 (row 8): . N B Q C K M B N . (pieces on b-i files)
     // Rank 3 (row 7): 10 pawns
-    // Rank 2 (row 8): _ N B Q _ _ K B N _ (M on files b and i, C on files c and h)
-    // Rank 1 (row 9): R _ _ _ _ _ _ _ _ R
-
-    // Let me use the canonical setup from chessvariants.com:
-    // Rank 1 (white): R . . . . . . . . R
-    // Rank 2 (white): . N B Q C . M K B N (adjusted)
-
-    // Actually the standard is:
-    // 1st rank: R at a1 and j1
-    // 2nd rank: N B Q C K M B N at b2-i2
-    // 3rd rank: 10 pawns
 
     // White back rank (row 9) - Rooks in corners
     _placePiece(board, 9, 0, Rook(color: PieceColor.white));
     _placePiece(board, 9, 9, Rook(color: PieceColor.white));
 
-    // White 2nd rank (row 8)
+    // White 2nd rank (row 8): N B Q C K M B N on files b-i
     _placePiece(board, 8, 1, Knight(color: PieceColor.white));
     _placePiece(board, 8, 2, Bishop(color: PieceColor.white));
     _placePiece(board, 8, 3, Queen(color: PieceColor.white));
     _placePiece(board, 8, 4, Cardinal(color: PieceColor.white));
-    _placePiece(board, 8, 5, Marshal(color: PieceColor.white));
-    _placePiece(board, 8, 6, King(color: PieceColor.white));
+    _placePiece(board, 8, 5, King(color: PieceColor.white));
+    _placePiece(board, 8, 6, Marshal(color: PieceColor.white));
     _placePiece(board, 8, 7, Bishop(color: PieceColor.white));
     _placePiece(board, 8, 8, Knight(color: PieceColor.white));
 
@@ -114,13 +78,13 @@ No castling in Grand Chess.
     _placePiece(board, 0, 0, Rook(color: PieceColor.black));
     _placePiece(board, 0, 9, Rook(color: PieceColor.black));
 
-    // Black 2nd rank (row 1)
+    // Black 2nd rank (row 1): N B Q C K M B N on files b-i
     _placePiece(board, 1, 1, Knight(color: PieceColor.black));
     _placePiece(board, 1, 2, Bishop(color: PieceColor.black));
     _placePiece(board, 1, 3, Queen(color: PieceColor.black));
     _placePiece(board, 1, 4, Cardinal(color: PieceColor.black));
-    _placePiece(board, 1, 5, Marshal(color: PieceColor.black));
-    _placePiece(board, 1, 6, King(color: PieceColor.black));
+    _placePiece(board, 1, 5, King(color: PieceColor.black));
+    _placePiece(board, 1, 6, Marshal(color: PieceColor.black));
     _placePiece(board, 1, 7, Bishop(color: PieceColor.black));
     _placePiece(board, 1, 8, Knight(color: PieceColor.black));
 

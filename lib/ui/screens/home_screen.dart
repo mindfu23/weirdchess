@@ -43,7 +43,7 @@ class HomeScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '10x10 chess variants with unique pieces',
+                    'Classic and variant chess with unique pieces',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Colors.grey[600],
                         ),
