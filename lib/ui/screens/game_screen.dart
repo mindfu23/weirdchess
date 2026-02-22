@@ -182,8 +182,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
               bottom: 16,
               child: PieceInfoPanel(),
             ),
-            // Pigeon chaos overlay — covers the full board when fired
-            if (pigeonEvent != null)
+            // Pigeon chaos overlay — Standard Chess + chaos enabled only
+            if (pigeonEvent != null &&
+                variant.id == 'standard_chess' &&
+                chaosEnabled)
               Positioned.fill(
                 child: PigeonFlashOverlay(event: pigeonEvent),
               ),

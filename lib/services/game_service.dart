@@ -257,6 +257,9 @@ class GameNotifier extends Notifier<GameState> {
     ref.read(atomicCratersProvider.notifier).clear();
     ref.read(atomicExplosionEventProvider.notifier).clear();
 
+    // Clear any stale pigeon event so it doesn't bleed into the new game/variant.
+    ref.read(pigeonEventProvider.notifier).clear();
+
     // If the AI should move first (human plays a non-first-turn colour), start AI.
     final playingAI = ref.read(playingAgainstAIProvider);
     final humanColor = ref.read(humanColorProvider);

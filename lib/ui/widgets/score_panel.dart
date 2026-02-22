@@ -4,6 +4,7 @@ import '../../core/game_state.dart';
 import '../../core/piece.dart';
 import '../../services/game_service.dart';
 import '../../variants/three_check.dart';
+import '../../variants/variant_base.dart';
 
 // ── Brand palette (mirrors home_screen / main.dart theme) ──────────────────
 const _kBackground = Color(0xFF1A1A1A);
@@ -38,6 +39,12 @@ class ScorePanel extends ConsumerWidget {
           // Three-Check counter
           if (variant.id == 'three_check') ...[
             _buildCheckCounter(gameState),
+            const SizedBox(height: 12),
+          ],
+
+          // 10×10 non-standard piece guide
+          if (variant.boardSize == 10) ...[
+            _buildPieceGuide(variant),
             const SizedBox(height: 12),
           ],
 
@@ -149,6 +156,86 @@ class ScorePanel extends ConsumerWidget {
             fontWeight: count >= 3 ? FontWeight.bold : FontWeight.normal,
           ),
         ),
+      ],
+    );
+  }
+
+  static const _standardSymbols = {'K', 'Q', 'R', 'B', 'N', 'P'};
+
+  Widget _buildPieceGuide(ChessVariant variant) {
+    final nonStandard = variant.pieceInfo.entries
+        .where((e) => !_standardSymbols.contains(e.key))
+        .toList();
+
+    if (nonStandard.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'PIECE GUIDE',
+          style: TextStyle(
+            fontFamily: 'Righteous',
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: _kAccent,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 6),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 200),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: nonStandard.map((e) {
+                final info = e.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 28,
+                        child: Text(
+                          info.symbol,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: _kTextPrimary,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              info.name,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: _kTextPrimary,
+                              ),
+                            ),
+                            Text(
+                              info.movementDescription,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: _kTextMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+        const Divider(height: 1, color: Color(0xFF4A5568)),
       ],
     );
   }
