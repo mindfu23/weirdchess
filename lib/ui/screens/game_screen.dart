@@ -22,7 +22,24 @@ class GameScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(variant.name),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(variant.name),
+            Text(
+              variant.description,
+              style: const TextStyle(
+                fontFamily: 'Righteous',
+                fontSize: 12,
+                color: Color(0xFF9B8E85),
+                fontWeight: FontWeight.normal,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/'),
