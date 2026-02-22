@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/game_state.dart';
 import '../../core/piece.dart';
 import '../../services/game_service.dart';
+import '../../variants/three_check.dart';
 
 // ── Brand palette (mirrors home_screen / main.dart theme) ──────────────────
 const _kBackground = Color(0xFF1A1A1A);
@@ -19,6 +20,7 @@ class ScorePanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(gameNotifierProvider);
     final notifier = ref.watch(gameNotifierProvider.notifier);
+    final variant = ref.watch(selectedVariantProvider);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -32,6 +34,12 @@ class ScorePanel extends ConsumerWidget {
           // Turn indicator
           _buildTurnIndicator(gameState, notifier.isAIThinking),
           const SizedBox(height: 12),
+
+          // Three-Check counter
+          if (variant.id == 'three_check') ...[
+            _buildCheckCounter(gameState),
+            const SizedBox(height: 12),
+          ],
 
           // Game result
           if (gameState.isGameOver) ...[
@@ -63,8 +71,14 @@ class ScorePanel extends ConsumerWidget {
               ),
               ElevatedButton.icon(
                 onPressed: () {
-                  final variant = ref.read(selectedVariantProvider);
-                  notifier.newGame(variant);
+                  final v = ref.read(selectedVariantProvider);
+                  if (v.id == 'horde') {
+                    ref
+                        .read(pendingHordeSideSelectionProvider.notifier)
+                        .set(true);
+                  } else {
+                    notifier.newGame(v);
+                  }
                 },
                 icon: const Icon(Icons.refresh, size: 18),
                 label: const Text('New'),
@@ -73,6 +87,69 @@ class ScorePanel extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCheckCounter(GameState gameState) {
+    final (whiteChecks, blackChecks) =
+        ThreeCheckChess.getCheckCounts(gameState.variantData);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Checks Given',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: _kTextMuted,
+          ),
+        ),
+        const SizedBox(height: 6),
+        _buildCheckRow('White', whiteChecks),
+        const SizedBox(height: 4),
+        _buildCheckRow('Black', blackChecks),
+        const Divider(height: 1, color: Color(0xFF4A5568)),
+      ],
+    );
+  }
+
+  Widget _buildCheckRow(String label, int count) {
+    return Row(
+      children: [
+        SizedBox(
+          width: 42,
+          child: Text(
+            label,
+            style: const TextStyle(fontSize: 12, color: _kTextMuted),
+          ),
+        ),
+        const SizedBox(width: 6),
+        for (int i = 0; i < 3; i++) ...[
+          Container(
+            width: 14,
+            height: 14,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: i < count ? _kAccent : Colors.transparent,
+              border: Border.all(
+                color: i < count ? _kAccent : _kTextMuted,
+                width: 1.5,
+              ),
+            ),
+          ),
+          if (i < 2) const SizedBox(width: 4),
+        ],
+        const SizedBox(width: 8),
+        Text(
+          '$count / 3',
+          style: TextStyle(
+            fontSize: 11,
+            color: count >= 3 ? _kAccent : _kTextMuted,
+            fontWeight: count >= 3 ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+      ],
     );
   }
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/piece.dart';
 import '../../services/game_service.dart';
 import '../../variants/variant_base.dart';
 
@@ -181,6 +182,9 @@ class _VariantGrid extends ConsumerWidget {
           variant: variant,
           onTap: () {
             ref.read(selectedVariantProvider.notifier).select(variant);
+            // Reset human colour to white before starting any new game so
+            // we don't accidentally trigger AI before the Horde dialog shows.
+            ref.read(humanColorProvider.notifier).set(PieceColor.white);
             ref.read(gameNotifierProvider.notifier).newGame(variant);
             context.go('/game');
           },

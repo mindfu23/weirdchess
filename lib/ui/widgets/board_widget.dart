@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/move.dart';
+import '../../core/piece.dart';
 import '../../services/game_service.dart';
+import '../../variants/king_of_the_hill.dart';
+import 'atomic_explosion_overlay.dart';
 import 'piece_widget.dart';
 
 /// Widget that displays the chess board.
@@ -12,6 +15,11 @@ class BoardWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final variant = ref.watch(selectedVariantProvider);
     final boardSize = variant.boardSize;
+    final humanColor = ref.watch(humanColorProvider);
+
+    // Flip the board when human plays Black in Horde Chess.
+    final isFlipped =
+        variant.id == 'horde' && humanColor == PieceColor.black;
 
     return AspectRatio(
       aspectRatio: 1.0,
@@ -20,23 +28,38 @@ class BoardWidget extends ConsumerWidget {
           border: Border.all(color: Colors.brown[800]!, width: 4),
           borderRadius: BorderRadius.circular(4),
         ),
-        child: GridView.builder(
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: boardSize,
-          ),
-          itemCount: boardSize * boardSize,
-          itemBuilder: (context, index) {
-            final row = index ~/ boardSize;
-            final col = index % boardSize;
-            final position = Position(row.toInt(), col.toInt());
+        child: Stack(
+          children: [
+            GridView.builder(
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: boardSize,
+              ),
+              itemCount: boardSize * boardSize,
+              itemBuilder: (context, index) {
+                final gridRow = isFlipped
+                    ? boardSize - 1 - (index ~/ boardSize)
+                    : index ~/ boardSize;
+                final gridCol = isFlipped
+                    ? boardSize - 1 - (index % boardSize)
+                    : index % boardSize;
+                final position = Position(gridRow, gridCol);
 
-            return _SquareWidget(
-              position: position,
-              lightColor: variant.lightSquareColor,
-              darkColor: variant.darkSquareColor,
-            );
-          },
+                return _SquareWidget(
+                  position: position,
+                  lightColor: variant.lightSquareColor,
+                  darkColor: variant.darkSquareColor,
+                );
+              },
+            ),
+            // Atomic explosion animation — only active for Atomic Chess.
+            if (variant.id == 'atomic')
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AtomicExplosionBoardOverlay(boardSize: boardSize),
+                ),
+              ),
+          ],
         ),
       ),
     );
@@ -58,9 +81,18 @@ class _SquareWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(gameNotifierProvider);
     final notifier = ref.watch(gameNotifierProvider.notifier);
+    final variant = ref.watch(selectedVariantProvider);
+    final craters = ref.watch(atomicCratersProvider);
 
     final isLight = (position.row + position.col) % 2 == 0;
     final squareColor = isLight ? lightColor : darkColor;
+
+    // King of the Hill: highlight the central 4 squares.
+    final isHillSquare = variant.id == 'king_of_the_hill' &&
+        KingOfTheHillChess.hillSquares.contains(position);
+
+    // Atomic Chess: persistent scorch mark after an explosion.
+    final isCrater = craters.contains(position);
 
     // Fog of War: compute fogged squares for the current player.
     final foggedSquares = notifier.foggedSquares;
@@ -111,6 +143,23 @@ class _SquareWidget extends ConsumerWidget {
                 child: Container(color: highlightColor),
               ),
 
+            // Atomic crater — scorched earth mark (before piece, after highlight)
+            if (isCrater)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        const Color(0xFF1A0A00).withAlpha(160),
+                        const Color(0xFF3D1A00).withAlpha(60),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.55, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+
             // Move indicator dot (empty squares not in fog)
             if (isValidMove && piece == null && !isInFog)
               Center(
@@ -132,6 +181,20 @@ class _SquareWidget extends ConsumerWidget {
                     final pieceSize = constraints.maxWidth * 0.8;
                     return PieceWidget(piece: piece, size: pieceSize);
                   },
+                ),
+              ),
+
+            // King of the Hill — golden border on the 4 central squares
+            if (isHillSquare)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: const Color(0xFFFFD700),
+                      width: 2.5,
+                    ),
+                    color: const Color(0xFFFFD700).withAlpha(18),
+                  ),
                 ),
               ),
 

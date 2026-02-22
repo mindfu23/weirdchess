@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/piece.dart';
 import '../../engine/ai_opponent.dart';
 import '../../services/game_service.dart';
 import '../widgets/board_widget.dart';
@@ -10,11 +11,85 @@ import '../widgets/commentary_widget.dart';
 import '../widgets/pigeon_flash_overlay.dart';
 
 /// Main game screen
-class GameScreen extends ConsumerWidget {
+class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GameScreen> createState() => _GameScreenState();
+}
+
+class _GameScreenState extends ConsumerState<GameScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Show side-selection for Horde on first load (covers home-screen nav,
+    // hot-reload, and any direct entry to the game screen).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final variant = ref.read(selectedVariantProvider);
+      if (variant.id == 'horde') {
+        // Clear the pending flag so ref.listen doesn't double-trigger.
+        ref.read(pendingHordeSideSelectionProvider.notifier).set(false);
+        _showHordeSideDialog();
+      }
+    });
+  }
+
+  void _showHordeSideDialog() {
+    final variant = ref.read(selectedVariantProvider);
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2D3542),
+        title: const Text(
+          'Choose Your Side',
+          style: TextStyle(
+            fontFamily: 'Righteous',
+            color: Color(0xFFF5E6D3),
+          ),
+        ),
+        content: const Text(
+          'White = the Horde (36 pawns)\nBlack = the defending Army',
+          style: TextStyle(color: Color(0xFF9B8E85), fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              ref.read(humanColorProvider.notifier).set(PieceColor.white);
+              ref.read(gameNotifierProvider.notifier).newGame(variant);
+              Navigator.pop(ctx);
+            },
+            child: const Text(
+              '♙ Play Horde (White)',
+              style: TextStyle(color: Color(0xFFF5E6D3)),
+            ),
+          ),
+          FilledButton(
+            onPressed: () {
+              ref.read(humanColorProvider.notifier).set(PieceColor.black);
+              ref.read(gameNotifierProvider.notifier).newGame(variant);
+              Navigator.pop(ctx);
+            },
+            child: const Text('♟ Play Army (Black)'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Listen for the pending-dialog flag set by home screen or score panel.
+    ref.listen<bool>(pendingHordeSideSelectionProvider, (prev, next) {
+      if (next && mounted) {
+        ref.read(pendingHordeSideSelectionProvider.notifier).set(false);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showHordeSideDialog();
+        });
+      }
+    });
+
     final variant = ref.watch(selectedVariantProvider);
     final difficulty = ref.watch(aiDifficultyProvider);
     final chaosEnabled = ref.watch(chaosModeProvider);

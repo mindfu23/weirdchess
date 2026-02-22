@@ -112,6 +112,71 @@ class ChaosModeNotifier extends Notifier<bool> {
 final chaosModeProvider =
     NotifierProvider<ChaosModeNotifier, bool>(ChaosModeNotifier.new);
 
+// ── Atomic Chess ──────────────────────────────────────────────────────────────
+
+/// Describes an atomic chess explosion event for the UI to animate.
+class AtomicExplosionEvent {
+  final Position center;
+  final Set<Position> blastSquares;
+
+  const AtomicExplosionEvent({
+    required this.center,
+    required this.blastSquares,
+  });
+}
+
+/// Tracks all squares hit by atomic explosions this game. Cleared on new game.
+class AtomicCratersNotifier extends Notifier<Set<Position>> {
+  @override
+  Set<Position> build() => {};
+
+  void clear() => state = {};
+  void addAll(Set<Position> positions) => state = {...state, ...positions};
+}
+
+final atomicCratersProvider =
+    NotifierProvider<AtomicCratersNotifier, Set<Position>>(
+        AtomicCratersNotifier.new);
+
+/// Active explosion event; null when no animation is playing.
+class AtomicExplosionEventNotifier extends Notifier<AtomicExplosionEvent?> {
+  @override
+  AtomicExplosionEvent? build() => null;
+
+  void trigger(AtomicExplosionEvent event) => state = event;
+  void clear() => state = null;
+}
+
+final atomicExplosionEventProvider =
+    NotifierProvider<AtomicExplosionEventNotifier, AtomicExplosionEvent?>(
+        AtomicExplosionEventNotifier.new);
+
+// ── Human colour / Horde side selection ──────────────────────────────────────
+
+/// Which colour the human player controls. Defaults to white.
+/// Only Horde Chess supports changing this; all other variants use white.
+class HumanColorNotifier extends Notifier<PieceColor> {
+  @override
+  PieceColor build() => PieceColor.white;
+
+  void set(PieceColor color) => state = color;
+}
+
+final humanColorProvider =
+    NotifierProvider<HumanColorNotifier, PieceColor>(HumanColorNotifier.new);
+
+/// Set to true to signal the game screen to show the Horde side-selection dialog.
+class PendingHordeSideSelectionNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+}
+
+final pendingHordeSideSelectionProvider =
+    NotifierProvider<PendingHordeSideSelectionNotifier, bool>(
+        PendingHordeSideSelectionNotifier.new);
+
 /// Describes a pigeon chaos teleport event for UI and commentary.
 class PigeonEvent {
   final Position from;
@@ -187,13 +252,25 @@ class GameNotifier extends Notifier<GameState> {
     _selectedPosition = null;
     _selectedPieceMoves = [];
     _isAIThinking = false;
+
+    // Clear atomic explosion state for the new game.
+    ref.read(atomicCratersProvider.notifier).clear();
+    ref.read(atomicExplosionEventProvider.notifier).clear();
+
+    // If the AI should move first (human plays a non-first-turn colour), start AI.
+    final playingAI = ref.read(playingAgainstAIProvider);
+    final humanColor = ref.read(humanColorProvider);
+    if (playingAI && !state.isGameOver && state.currentTurn != humanColor) {
+      _makeAIMove();
+    }
   }
 
   Future<void> onSquareTap(Position position) async {
     if (state.isGameOver || _isAIThinking) return;
 
     final playingAI = ref.read(playingAgainstAIProvider);
-    if (playingAI && state.currentTurn == PieceColor.black) return;
+    final humanColor = ref.read(humanColorProvider);
+    if (playingAI && state.currentTurn != humanColor) return;
 
     final piece = state.board.getPiece(position);
     final variant = ref.read(selectedVariantProvider);
@@ -229,6 +306,9 @@ class GameNotifier extends Notifier<GameState> {
       _selectedPosition = null;
       _selectedPieceMoves = [];
 
+      // Handle atomic explosion animation (awaited before AI moves).
+      await _handleAtomicExplosion();
+
       bool pigeonFired = false;
       final variant = ref.read(selectedVariantProvider);
       final chaosEnabled = ref.read(chaosModeProvider);
@@ -243,10 +323,35 @@ class GameNotifier extends Notifier<GameState> {
       }
 
       final playingAI = ref.read(playingAgainstAIProvider);
-      if (playingAI && !state.isGameOver && state.currentTurn == PieceColor.black) {
+      final humanColor = ref.read(humanColorProvider);
+      if (playingAI && !state.isGameOver && state.currentTurn != humanColor) {
         _makeAIMove();
       }
     }
+  }
+
+  /// Detects if the last move triggered an atomic explosion, updates the crater
+  /// provider, fires the animation event, and waits for the animation to complete.
+  Future<void> _handleAtomicExplosion() async {
+    final variant = ref.read(selectedVariantProvider);
+    if (variant.id != 'atomic' || state.moveHistory.isEmpty) return;
+
+    final lastRecord = state.moveHistory.last;
+    if (lastRecord.capturedPiece == null) return;
+
+    final blastPositions = <Position>{lastRecord.move.to};
+    for (final (pos, _) in lastRecord.explosionCasualties) {
+      blastPositions.add(pos);
+    }
+
+    ref.read(atomicCratersProvider.notifier).addAll(blastPositions);
+    ref.read(atomicExplosionEventProvider.notifier).trigger(AtomicExplosionEvent(
+      center: lastRecord.move.to,
+      blastSquares: blastPositions,
+    ));
+
+    await Future.delayed(const Duration(milliseconds: 900));
+    ref.read(atomicExplosionEventProvider.notifier).clear();
   }
 
   bool _triggerPigeonChaos() {
@@ -351,6 +456,9 @@ class GameNotifier extends Notifier<GameState> {
       final newState = state.copy();
       newState.makeMove(move);
       state = newState;
+
+      // Show explosion animation when AI triggers an atomic capture.
+      await _handleAtomicExplosion();
 
       if (piece != null) {
         _generateCommentary(move, piece, capturedPiece);
