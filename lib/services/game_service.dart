@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/game_state.dart';
 import '../core/move.dart';
@@ -67,6 +68,53 @@ final playingAgainstAIProvider =
     NotifierProvider<PlayingAgainstAINotifier, bool>(
         PlayingAgainstAINotifier.new);
 
+/// Chaos (pigeon) mode toggle — Standard Chess only
+class ChaosModeNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void toggle() => state = !state;
+}
+
+final chaosModeProvider =
+    NotifierProvider<ChaosModeNotifier, bool>(ChaosModeNotifier.new);
+
+/// Describes a pigeon chaos teleport event for UI and commentary.
+class PigeonEvent {
+  final Position from;
+  final Position to;
+  final PieceColor pieceColor;
+  final String pieceName;
+  final String fromSquare;
+  final String toSquare;
+
+  /// True when the teleported piece belonged to the AI (Black).
+  final bool affectedAIPiece;
+
+  const PigeonEvent({
+    required this.from,
+    required this.to,
+    required this.pieceColor,
+    required this.pieceName,
+    required this.fromSquare,
+    required this.toSquare,
+    required this.affectedAIPiece,
+  });
+}
+
+/// Holds the active pigeon event; null when no event is in progress.
+class PigeonEventNotifier extends Notifier<PigeonEvent?> {
+  @override
+  PigeonEvent? build() => null;
+
+  void trigger(PigeonEvent event) => state = event;
+  void clear() => state = null;
+}
+
+final pigeonEventProvider =
+    NotifierProvider<PigeonEventNotifier, PigeonEvent?>(
+        PigeonEventNotifier.new);
+
 /// Game state notifier
 class GameNotifier extends Notifier<GameState> {
   Position? _selectedPosition;
@@ -114,7 +162,7 @@ class GameNotifier extends Notifier<GameState> {
 
       if (_selectedPieceMoves.any((m) => m.to == position)) {
         // Make the move
-        _makeMove(move);
+        await _makeMove(move);
         return;
       }
     }
@@ -132,18 +180,125 @@ class GameNotifier extends Notifier<GameState> {
     }
   }
 
-  void _makeMove(Move move) {
+  Future<void> _makeMove(Move move) async {
     final newState = state.copy();
     if (newState.makeMove(move)) {
       state = newState;
       _selectedPosition = null;
       _selectedPieceMoves = [];
 
+      // Check for pigeon chaos event (Standard Chess only, every 5 half-moves)
+      bool pigeonFired = false;
+      final variant = ref.read(selectedVariantProvider);
+      final chaosEnabled = ref.read(chaosModeProvider);
+      if (chaosEnabled &&
+          variant.id == 'standard_chess' &&
+          state.moveHistory.length % 5 == 0) {
+        pigeonFired = _triggerPigeonChaos();
+      }
+
+      // If a pigeon fired, delay the AI response so the flash and
+      // commentary have time to be seen before the AI starts thinking.
+      if (pigeonFired) {
+        await Future.delayed(const Duration(seconds: 3));
+      }
+
       // AI's turn
       final playingAI = ref.read(playingAgainstAIProvider);
       if (playingAI && !state.isGameOver && state.currentTurn == PieceColor.black) {
         _makeAIMove();
       }
+    }
+  }
+
+  /// Teleport a random non-king piece to a random empty square.
+  /// Retries up to 10 times to avoid leaving either king in check.
+  /// Returns true if the event fired successfully.
+  bool _triggerPigeonChaos() {
+    final board = state.board;
+    final random = Random();
+
+    // All non-king pieces from both sides are candidates
+    final candidates = <(Position, Piece)>[
+      ...board.getPieces(PieceColor.white).where((p) => p.$2.symbol != 'K'),
+      ...board.getPieces(PieceColor.black).where((p) => p.$2.symbol != 'K'),
+    ];
+    if (candidates.isEmpty) return false;
+
+    // Collect all empty squares
+    final emptySquares = <Position>[];
+    for (int row = 0; row < board.size; row++) {
+      for (int col = 0; col < board.size; col++) {
+        final pos = Position(row, col);
+        if (board.getPiece(pos) == null) emptySquares.add(pos);
+      }
+    }
+    if (emptySquares.isEmpty) return false;
+
+    const maxAttempts = 10;
+    for (int attempt = 0; attempt < maxAttempts; attempt++) {
+      final (fromPos, piece) = candidates[random.nextInt(candidates.length)];
+      final toPos = emptySquares[random.nextInt(emptySquares.length)];
+
+      if (fromPos == toPos) continue;
+
+      // Verify this doesn't leave either king in check
+      final testBoard = board.copy();
+      testBoard.removePiece(fromPos);
+      testBoard.setPiece(toPos, piece);
+
+      if (!testBoard.isInCheck(PieceColor.white) &&
+          !testBoard.isInCheck(PieceColor.black)) {
+        // Apply the teleport
+        final newState = state.copy();
+        newState.board.removePiece(fromPos);
+        newState.board.setPiece(toPos, piece);
+        state = newState;
+
+        final event = PigeonEvent(
+          from: fromPos,
+          to: toPos,
+          pieceColor: piece.color,
+          pieceName: piece.name,
+          fromSquare: fromPos.toAlgebraic(board.size),
+          toSquare: toPos.toAlgebraic(board.size),
+          affectedAIPiece: piece.color == PieceColor.black,
+        );
+
+        ref.read(pigeonEventProvider.notifier).trigger(event);
+        _generatePigeonCommentary(event);
+        return true;
+      }
+    }
+
+    return false; // Couldn't find a safe teleport — skip this time
+  }
+
+  /// Ask the LLM to comment on the pigeon disruption.
+  Future<void> _generatePigeonCommentary(PigeonEvent event) async {
+    final auth = ref.read(authProvider);
+    final llmConfig = ref.read(llmConfigProvider);
+    if (!auth.isAuthenticated && llmConfig.directMode) return;
+    if (!llmConfig.enabled) return;
+
+    final llmService = ref.read(llmServiceProvider);
+    final commentaryNotifier = ref.read(commentaryProvider.notifier);
+
+    commentaryNotifier.setLoading();
+
+    final response = await llmService.generatePigeonCommentary(
+      pieceName: event.pieceName,
+      pieceColorName: event.pieceColor == PieceColor.white ? 'White' : 'Black',
+      fromSquare: event.fromSquare,
+      toSquare: event.toSquare,
+      affectedAIPiece: event.affectedAIPiece,
+      authHeader: auth.authHeader,
+    );
+
+    if (response.isError) {
+      commentaryNotifier.setError(response.text);
+    } else {
+      commentaryNotifier.setCommentary(response.text);
     }
   }
 

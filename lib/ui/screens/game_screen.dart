@@ -7,6 +7,7 @@ import '../widgets/board_widget.dart';
 import '../widgets/score_panel.dart';
 import '../widgets/piece_info_panel.dart';
 import '../widgets/commentary_widget.dart';
+import '../widgets/pigeon_flash_overlay.dart';
 
 /// Main game screen
 class GameScreen extends ConsumerWidget {
@@ -16,6 +17,8 @@ class GameScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final variant = ref.watch(selectedVariantProvider);
     final difficulty = ref.watch(aiDifficultyProvider);
+    final chaosEnabled = ref.watch(chaosModeProvider);
+    final pigeonEvent = ref.watch(pigeonEventProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -25,6 +28,28 @@ class GameScreen extends ConsumerWidget {
           onPressed: () => context.go('/'),
         ),
         actions: [
+          // Pigeon chaos toggle — Standard Chess only
+          if (variant.id == 'standard_chess')
+            IconButton(
+              icon: Text(
+                '🕊️',
+                style: TextStyle(
+                  fontSize: 20,
+                  // Dimmed when off so the active state is obvious
+                  color: chaosEnabled
+                      ? null
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withAlpha(80),
+                ),
+              ),
+              tooltip: chaosEnabled
+                  ? 'Pigeon Mode: ON — tap to disable'
+                  : 'Pigeon Mode: OFF — tap to enable',
+              onPressed: () =>
+                  ref.read(chaosModeProvider.notifier).toggle(),
+            ),
           // Difficulty selector
           PopupMenuButton<AIDifficulty>(
             icon: const Icon(Icons.psychology),
@@ -59,6 +84,11 @@ class GameScreen extends ConsumerWidget {
               bottom: 16,
               child: PieceInfoPanel(),
             ),
+            // Pigeon chaos overlay — covers the full board when fired
+            if (pigeonEvent != null)
+              Positioned.fill(
+                child: PigeonFlashOverlay(event: pigeonEvent),
+              ),
           ],
         ),
       ),

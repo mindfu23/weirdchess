@@ -161,11 +161,14 @@ Keep commentary to 1-2 sentences. Be dramatic but not silly.''',
     name: 'Classical Commentator',
     systemPrompt: '''You are a classical chess commentator with deep appreciation for the game.
 Your tone is knowledgeable and engaging. Reference famous games and players when relevant.
-Keep commentary to 1-2 sentences. Use proper chess terminology.''',
+Keep commentary to 1-2 sentences. Use proper chess terminology.
+Occasionally, a pigeon may land on the board and scatter a piece to a random square.
+When this happens, react with exasperation and dark humor — pigeons are the bane of serious chess.''',
     examplePhrases: [
       'A solid developing move.',
       'The center is contested fiercely.',
       'Reminiscent of the great masters.',
+      'Not again — these wretched pigeons have no respect for the game!',
     ],
   );
 
@@ -474,6 +477,75 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
     } else {
       return CommentaryResponse.error('Google error: ${response.statusCode}');
     }
+  }
+
+  /// Generate commentary for a pigeon chaos event.
+  ///
+  /// Uses the Standard Chess personality. The prompt changes depending on
+  /// whether the pigeon moved the AI's own piece (extra outrage warranted).
+  Future<CommentaryResponse> generatePigeonCommentary({
+    required String pieceName,
+    required String pieceColorName,
+    required String fromSquare,
+    required String toSquare,
+    required bool affectedAIPiece,
+    String? authHeader,
+  }) async {
+    if (!config.enabled) return const CommentaryResponse(text: '');
+    if (config.directMode && authHeader == null) {
+      return const CommentaryResponse(text: '');
+    }
+
+    final personality = VariantPersonalities.standardChess;
+
+    final ownPieceNote = affectedAIPiece
+        ? ' To make matters worse, it was YOUR piece that got knocked around!'
+        : '';
+
+    final prompt =
+        'CHAOS EVENT: A pigeon just crash-landed on the board, scattering '
+        "$pieceColorName's $pieceName from $fromSquare to $toSquare!$ownPieceNote\n\n"
+        'In 1-2 sentences, react with exasperation and dark humor as a classical '
+        'chess commentator. Make clear how pesky and infuriating this pigeon is. '
+        'If your own piece was moved, be especially indignant.';
+
+    // Reuse the same retry loop as generateCommentary
+    int attempt = 0;
+    Duration delay = const Duration(milliseconds: 500);
+
+    while (attempt < config.maxRetries) {
+      try {
+        final response = config.directMode
+            ? await _callProviderDirect(
+                personality.systemPrompt, prompt, authHeader!)
+            : await _callNetlifyFunction(
+                personality.systemPrompt, prompt, personality.variantId, authHeader);
+
+        if (!response.isError) return response;
+
+        if (_isRetryableError(response.text)) {
+          attempt++;
+          if (attempt < config.maxRetries) {
+            await Future.delayed(delay);
+            delay *= 2;
+            continue;
+          }
+        }
+
+        return CommentaryResponse.error(response.text, retryCount: attempt);
+      } catch (e) {
+        attempt++;
+        if (attempt < config.maxRetries && _isRetryableException(e)) {
+          await Future.delayed(delay);
+          delay *= 2;
+          continue;
+        }
+        return CommentaryResponse.error('Connection error: $e',
+            retryCount: attempt);
+      }
+    }
+
+    return CommentaryResponse.error('Max retries exceeded', retryCount: attempt);
   }
 
   String _describeMove(
