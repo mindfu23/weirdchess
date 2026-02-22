@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/game_service.dart';
 import '../../variants/variant_base.dart';
 
 /// Home screen with variant selection — 2-column grid with section headers
-/// for 8×8 and 10×10 variants.
+/// for 8×8 and 10×10 variants.  Content is centre-clamped to 460 px so
+/// cards don't balloon on wide/desktop screens.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -20,13 +22,24 @@ class HomeScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A1A1A),
         elevation: 0,
-        title: const Text(
-          'WeirdChess',
-          style: TextStyle(
-            color: Color(0xFFF5E6D3),
-            fontWeight: FontWeight.bold,
-            fontSize: 24,
-          ),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SvgPicture.asset(
+              'assets/images/mascot.svg',
+              width: 36,
+              height: 36,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'WeirdChess',
+              style: const TextStyle(
+                fontFamily: 'Righteous',
+                color: Color(0xFFF5E6D3),
+                fontSize: 24,
+              ),
+            ),
+          ],
         ),
         centerTitle: true,
         actions: [
@@ -38,53 +51,59 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
-            // Header
-            SliverToBoxAdapter(
-              child: Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Choose a Variant',
-                      style: TextStyle(
-                        color: Color(0xFFF5E6D3),
-                        fontSize: 20,
-                        fontWeight: FontWeight.w600,
-                      ),
+        child: Center(
+          child: ConstrainedBox(
+            // Clamp to phone-like width so cards don't stretch on wide screens.
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: CustomScrollView(
+              slivers: [
+                // Header
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Choose a Variant',
+                          style: TextStyle(
+                            fontFamily: 'Righteous',
+                            color: Color(0xFFF5E6D3),
+                            fontSize: 20,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${variants.length} variants — classic rules and wild twists',
+                          style: const TextStyle(
+                            color: Color(0xFF9B8E85),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${variants.length} variants — classic rules and wild twists',
-                      style: const TextStyle(
-                        color: Color(0xFF9B8E85),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
 
-            // ── 8×8 section ─────────────────────────────────────────────
-            _SectionHeader(
-              label: '8×8 Variants',
-              count: variants8x8.length,
-            ),
-            _VariantGrid(variants: variants8x8),
+                // ── 8×8 section ───────────────────────────────────────────
+                _SectionHeader(
+                  label: '8×8 Variants',
+                  count: variants8x8.length,
+                ),
+                _VariantGrid(variants: variants8x8),
 
-            // ── 10×10 section ────────────────────────────────────────────
-            _SectionHeader(
-              label: '10×10 Variants',
-              count: variants10x10.length,
-            ),
-            _VariantGrid(variants: variants10x10),
+                // ── 10×10 section ─────────────────────────────────────────
+                _SectionHeader(
+                  label: '10×10 Variants',
+                  count: variants10x10.length,
+                ),
+                _VariantGrid(variants: variants10x10),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          ],
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -115,7 +134,8 @@ class _SectionHeader extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
                 color: const Color(0xFF2D3542),
                 borderRadius: BorderRadius.circular(8),
@@ -154,7 +174,8 @@ class _VariantGrid extends ConsumerWidget {
           crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 1.1,
+          // Fixed height per card — compact without the board preview.
+          mainAxisExtent: 112,
         ),
         delegate: SliverChildBuilderDelegate(
           (context, index) {
@@ -220,7 +241,7 @@ class _VariantCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final boardSize = variant.boardSize;
-    final sizeLabel = '${boardSize}×$boardSize';
+    final sizeLabel = '$boardSize×$boardSize';
 
     return Material(
       color: const Color(0xFF2D3542),
@@ -231,101 +252,108 @@ class _VariantCard extends StatelessWidget {
         splashColor: const Color(0xFFFF9B8A).withAlpha(40),
         highlightColor: const Color(0xFFFF9B8A).withAlpha(20),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icon + size badge row
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      _iconFor(variant.id),
-                      color: const Color(0xFFFF9B8A),
-                      size: 22,
-                    ),
+              // Size badge — top right
+              Align(
+                alignment: Alignment.centerRight,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A1A1A),
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  const Spacer(),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1A1A),
-                      borderRadius: BorderRadius.circular(6),
+                  child: Text(
+                    sizeLabel,
+                    style: const TextStyle(
+                      color: Color(0xFF9B8E85),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
                     ),
-                    child: Text(
-                      sizeLabel,
-                      style: const TextStyle(
-                        color: Color(0xFF9B8E85),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 10),
-
-              // Mini board preview
-              SizedBox(
-                width: 36,
-                height: 36,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: GridView.builder(
-                    physics: const NeverScrollableScrollPhysics(),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 4,
-                    ),
-                    itemCount: 16,
-                    itemBuilder: (_, i) {
-                      final r = i ~/ 4;
-                      final c = i % 4;
-                      return Container(
-                        color: (r + c) % 2 == 0
-                            ? variant.lightSquareColor
-                            : variant.darkSquareColor,
-                      );
-                    },
                   ),
                 ),
               ),
 
               const SizedBox(height: 8),
 
-              // Variant name
-              Text(
-                variant.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFFF5E6D3),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                ),
+              // Icon + name/description on the same row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(
+                      _iconFor(variant.id),
+                      color: const Color(0xFFFF9B8A),
+                      size: 18,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.start,
+                      children: [
+                        Text(
+                          variant.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFFF5E6D3),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          variant.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF9B8E85),
+                            fontSize: 10,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
 
-              const SizedBox(height: 2),
-
-              // Description
-              Expanded(
-                child: Text(
-                  variant.description,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF9B8E85),
-                    fontSize: 10,
-                    height: 1.4,
+              // Mini board colour preview — kept for reference, hidden from UI.
+              Offstage(
+                offstage: true,
+                child: SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: GridView.builder(
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 4,
+                      ),
+                      itemCount: 16,
+                      itemBuilder: (_, i) {
+                        final r = i ~/ 4;
+                        final c = i % 4;
+                        return Container(
+                          color: (r + c) % 2 == 0
+                              ? variant.lightSquareColor
+                              : variant.darkSquareColor,
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
