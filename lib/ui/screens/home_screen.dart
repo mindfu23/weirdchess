@@ -83,24 +83,60 @@ class HomeScreen extends ConsumerWidget {
                     ),
                   ),
 
-                  // Tab bar
-                  const TabBar(
-                    labelColor: Color(0xFFFF9B8A),
-                    unselectedLabelColor: Color(0xFF9B8E85),
-                    indicatorColor: Color(0xFFFF9B8A),
+                  // Tab bar — left-aligned, with size + layout description
+                  TabBar(
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    labelColor: const Color(0xFFFF9B8A),
+                    unselectedLabelColor: const Color(0xFF9B8E85),
+                    indicatorColor: const Color(0xFFFF9B8A),
                     indicatorSize: TabBarIndicatorSize.label,
-                    dividerColor: Color(0xFF2D3542),
-                    labelStyle: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
-                    ),
-                    unselectedLabelStyle: TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
+                    dividerColor: const Color(0xFF2D3542),
                     tabs: [
-                      Tab(text: '8×8'),
-                      Tab(text: '10×10'),
+                      Tab(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Text(
+                              '8×8 Variants',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              'Standard Layout',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Tab(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Text(
+                              '10×10 Variants',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              'Larger Layout',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
 
