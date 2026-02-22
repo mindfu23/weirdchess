@@ -43,10 +43,29 @@ class Board {
       removePiece(Position(captureRow, move.to.col));
     }
 
-    // Handle castling
+    // Handle castling — scan dynamically for the rook so Chess960 positions
+    // (where rooks may not be on the a/h file) work correctly.
     if (move.isCastling) {
       final isKingside = move.to.col > move.from.col;
-      final rookFromCol = isKingside ? size - 1 : 0;
+      int? rookFromCol;
+      if (isKingside) {
+        for (int col = size - 1; col > move.from.col; col--) {
+          final p = getPiece(Position(move.from.row, col));
+          if (p != null && p.symbol == 'R' && p.color == piece.color && !p.hasMoved) {
+            rookFromCol = col;
+            break;
+          }
+        }
+        rookFromCol ??= size - 1;
+      } else {
+        for (int col = 0; col < move.from.col; col++) {
+          final p = getPiece(Position(move.from.row, col));
+          if (p != null && p.symbol == 'R' && p.color == piece.color && !p.hasMoved) {
+            rookFromCol = col;
+          }
+        }
+        rookFromCol ??= 0;
+      }
       final rookToCol = isKingside ? move.to.col - 1 : move.to.col + 1;
       final rook = removePiece(Position(move.from.row, rookFromCol));
       if (rook != null) {

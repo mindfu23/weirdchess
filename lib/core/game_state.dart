@@ -1,34 +1,13 @@
 import 'dart:convert';
 import 'board.dart';
+import 'game_result.dart';
 import 'move.dart';
 import 'piece.dart';
+import 'variant_interface.dart';
 
-/// Possible game results
-enum GameResult {
-  ongoing,
-  whiteWins,
-  blackWins,
-  draw,
-  stalemate,
-}
+export 'game_result.dart';
 
-extension GameResultExtension on GameResult {
-  String get pgnResult {
-    switch (this) {
-      case GameResult.whiteWins:
-        return '1-0';
-      case GameResult.blackWins:
-        return '0-1';
-      case GameResult.draw:
-      case GameResult.stalemate:
-        return '1/2-1/2';
-      case GameResult.ongoing:
-        return '*';
-    }
-  }
-}
-
-/// Represents a move with captured piece information for undo
+/// Represents a move record for undo support.
 class MoveRecord {
   final Move move;
   final Piece? capturedPiece;
@@ -36,26 +15,45 @@ class MoveRecord {
   final bool pieceHadMoved;
   final String? pieceName;
 
+  /// A copy of the moving piece *before* the move (used to restore promotions
+  /// and maintain exact piece state on undo).
+  final Piece? originalPiece;
+
+  /// Original rook column for castling undo (supports Chess960).
+  final int? rookOriginalCol;
+
+  /// Pieces destroyed by variant post-capture effects (e.g., Atomic explosions).
+  /// Restored in [GameState.undoMove].
+  final List<(Position, Piece)> explosionCasualties;
+
+  /// Snapshot of variantData before this move — allows undoing Three-Check
+  /// counters and any other variant-specific state.
+  final Map<String, dynamic>? previousVariantData;
+
   MoveRecord({
     required this.move,
     this.capturedPiece,
     this.previousEnPassant,
     required this.pieceHadMoved,
     this.pieceName,
+    this.originalPiece,
+    this.rookOriginalCol,
+    this.explosionCasualties = const [],
+    this.previousVariantData,
   });
 
   Map<String, dynamic> toJson() => {
-    'from': '${move.from.row},${move.from.col}',
-    'to': '${move.to.row},${move.to.col}',
-    'isCapture': move.isCapture,
-    'isCastling': move.isCastling,
-    'isEnPassant': move.isEnPassant,
-    'promotionPiece': move.promotionPiece,
-    'pieceName': pieceName,
-  };
+        'from': '${move.from.row},${move.from.col}',
+        'to': '${move.to.row},${move.to.col}',
+        'isCapture': move.isCapture,
+        'isCastling': move.isCastling,
+        'isEnPassant': move.isEnPassant,
+        'promotionPiece': move.promotionPiece,
+        'pieceName': pieceName,
+      };
 }
 
-/// Manages the complete state of a chess game
+/// Manages the complete state of a chess game.
 class GameState {
   final Board board;
   final String variantName;
@@ -64,8 +62,14 @@ class GameState {
   final List<Piece> whiteCaptured;
   final List<Piece> blackCaptured;
   GameResult result;
-  int halfMoveClock; // For 50-move rule
+  int halfMoveClock;
   int fullMoveNumber;
+
+  /// Variant-specific rule hooks. Set by [ChessVariant.createNewGame].
+  final ChessVariantInterface? variant;
+
+  /// Arbitrary variant-specific state (e.g., Three-Check counters).
+  Map<String, dynamic> variantData;
 
   // Game metadata for PGN
   String? event;
@@ -84,6 +88,8 @@ class GameState {
     this.result = GameResult.ongoing,
     this.halfMoveClock = 0,
     this.fullMoveNumber = 1,
+    this.variant,
+    Map<String, dynamic>? variantData,
     this.event,
     this.site,
     this.date,
@@ -91,32 +97,96 @@ class GameState {
     this.blackPlayer,
   })  : moveHistory = moveHistory ?? [],
         whiteCaptured = whiteCaptured ?? [],
-        blackCaptured = blackCaptured ?? [];
+        blackCaptured = blackCaptured ?? [],
+        variantData = variantData ?? {};
 
-  /// Execute a move and update game state
+  /// Returns all legal moves for [color], using variant-aware move generation.
+  List<Move> getAllLegalMoves(PieceColor color) {
+    if (variant != null) {
+      final moves = <Move>[];
+      for (final (pos, piece) in board.getPieces(color)) {
+        moves.addAll(variant!.getLegalMoves(board, pos, piece));
+      }
+      return moves;
+    }
+    return board.getAllLegalMoves(color);
+  }
+
+  /// Execute a move and update game state.
   bool makeMove(Move move) {
     final piece = board.getPiece(move.from);
     if (piece == null || piece.color != currentTurn) return false;
 
-    final legalMoves = piece.getLegalMoves(board, move.from);
-    final legalMove = legalMoves.firstWhere(
-      (m) => m.to == move.to && (move.promotionPiece == null || m.promotionPiece == move.promotionPiece),
-      orElse: () => move,
-    );
+    // Use variant-aware legal move generation for validation.
+    final legalMoves = variant != null
+        ? variant!.getLegalMoves(board, move.from, piece)
+        : piece.getLegalMoves(board, move.from);
 
     if (!legalMoves.any((m) => m.to == move.to)) return false;
 
-    // Record for undo
-    final capturedPiece = board.getPiece(move.to);
+    final legalMove = legalMoves.firstWhere(
+      (m) =>
+          m.to == move.to &&
+          (move.promotionPiece == null ||
+              m.promotionPiece == move.promotionPiece),
+      orElse: () => legalMoves.firstWhere((m) => m.to == move.to),
+    );
+
+    // Snapshot variant data for undo before anything mutates.
+    final previousVariantData = Map<String, dynamic>.from(variantData);
+
+    // Record the original piece (before any board change) for promotion undo.
+    final originalPiece = piece.copy();
+
+    // Determine captured piece position (en passant has different capture square).
+    final capturePos = legalMove.isEnPassant
+        ? Position(move.from.row, move.to.col)
+        : legalMove.to;
+    final capturedPiece = board.getPiece(capturePos);
+
+    // Find rook's original column before the board mutates (for castling undo).
+    int? rookOriginalCol;
+    if (legalMove.isCastling) {
+      final isKingside = legalMove.to.col > legalMove.from.col;
+      if (isKingside) {
+        for (int col = board.size - 1; col > legalMove.from.col; col--) {
+          final p = board.getPiece(Position(legalMove.from.row, col));
+          if (p != null &&
+              p.symbol == 'R' &&
+              p.color == piece.color &&
+              !p.hasMoved) {
+            rookOriginalCol = col;
+            break;
+          }
+        }
+      } else {
+        for (int col = 0; col < legalMove.from.col; col++) {
+          final p = board.getPiece(Position(legalMove.from.row, col));
+          if (p != null &&
+              p.symbol == 'R' &&
+              p.color == piece.color &&
+              !p.hasMoved) {
+            rookOriginalCol = col;
+          }
+        }
+      }
+      rookOriginalCol ??= legalMove.to.col > legalMove.from.col
+          ? board.size - 1
+          : 0;
+    }
+
     final record = MoveRecord(
       move: legalMove,
       capturedPiece: capturedPiece,
       previousEnPassant: board.enPassantTarget,
       pieceHadMoved: piece.hasMoved,
       pieceName: piece.name,
+      originalPiece: originalPiece,
+      rookOriginalCol: rookOriginalCol,
+      previousVariantData: previousVariantData,
     );
 
-    // Track captured pieces
+    // Track captured pieces in the captured lists.
     if (capturedPiece != null) {
       if (capturedPiece.color == PieceColor.white) {
         whiteCaptured.add(capturedPiece);
@@ -125,11 +195,43 @@ class GameState {
       }
     }
 
-    // Execute the move
+    // Execute the move on the board.
     board.makeMove(legalMove);
-    moveHistory.add(record);
 
-    // Update clocks
+    // Handle pawn promotion.
+    if (legalMove.promotionPiece != null) {
+      final destPiece = board.getPiece(legalMove.to);
+      if (destPiece?.symbol == 'P') {
+        final promoted = variant?.createPiece(
+                legalMove.promotionPiece!, destPiece!.color) ??
+            _fallbackCreatePiece(legalMove.promotionPiece!, destPiece!.color);
+        promoted.hasMoved = true;
+        board.setPiece(legalMove.to, promoted);
+      }
+    }
+
+    // Apply variant post-capture effects (e.g., Atomic explosions) and record
+    // any additional casualties for undo.
+    List<(Position, Piece)> explosionCasualties = [];
+    if (legalMove.isCapture && variant != null) {
+      explosionCasualties = variant!.applyPostCaptureEffect(board, legalMove);
+    }
+
+    // Rebuild the record with casualties (Dart records are immutable, so we
+    // create a new one and swap it into moveHistory after adding the first).
+    moveHistory.add(MoveRecord(
+      move: record.move,
+      capturedPiece: record.capturedPiece,
+      previousEnPassant: record.previousEnPassant,
+      pieceHadMoved: record.pieceHadMoved,
+      pieceName: record.pieceName,
+      originalPiece: record.originalPiece,
+      rookOriginalCol: record.rookOriginalCol,
+      explosionCasualties: explosionCasualties,
+      previousVariantData: record.previousVariantData,
+    ));
+
+    // Update clocks.
     if (capturedPiece != null || piece.symbol == 'P') {
       halfMoveClock = 0;
     } else {
@@ -140,32 +242,58 @@ class GameState {
       fullMoveNumber++;
     }
 
-    // Switch turn
+    // Let the variant update its own state data (e.g., check counters).
+    variant?.updateVariantData(board, legalMove, currentTurn, variantData);
+
+    // Switch turn.
     currentTurn = currentTurn.opposite;
 
-    // Check game result
+    // Evaluate standard game result then let the variant override.
     _updateGameResult();
+    final variantResult =
+        variant?.checkVariantResult(board, currentTurn, variantData);
+    if (variantResult != null) result = variantResult;
 
     return true;
   }
 
-  /// Undo the last move
+  /// Undo the last move.
   bool undoMove() {
     if (moveHistory.isEmpty) return false;
 
     final record = moveHistory.removeLast();
     final move = record.move;
 
-    // Move piece back
-    final piece = board.removePiece(move.to);
-    if (piece != null) {
-      piece.hasMoved = record.pieceHadMoved;
-      board.setPiece(move.from, piece);
+    // Switch turn back first.
+    currentTurn = currentTurn.opposite;
+    if (currentTurn == PieceColor.black) {
+      fullMoveNumber--;
     }
 
-    // Restore captured piece
+    // Restore explosion casualties (Atomic chess etc.) before restoring pieces.
+    for (final (pos, casualty) in record.explosionCasualties) {
+      board.setPiece(pos, casualty);
+    }
+
+    // Restore the moving piece using the originalPiece snapshot (handles
+    // promotion: the queen at move.to is replaced with the original pawn).
+    board.removePiece(move.to);
+    final pieceToRestore = record.originalPiece?.copy() ??
+        board.getPiece(move.from); // should never be needed
+    if (pieceToRestore != null) {
+      pieceToRestore.hasMoved = record.pieceHadMoved;
+      board.setPiece(move.from, pieceToRestore);
+    }
+
+    // Restore captured piece.
     if (record.capturedPiece != null) {
-      board.setPiece(move.to, record.capturedPiece);
+      if (move.isEnPassant) {
+        // En passant captured pawn is on a different square than move.to.
+        board.setPiece(
+            Position(move.from.row, move.to.col), record.capturedPiece);
+      } else {
+        board.setPiece(move.to, record.capturedPiece);
+      }
       if (record.capturedPiece!.color == PieceColor.white) {
         whiteCaptured.removeLast();
       } else {
@@ -173,43 +301,36 @@ class GameState {
       }
     }
 
-    // Handle en passant undo
-    if (move.isEnPassant && record.capturedPiece != null) {
-      final capturePos = Position(move.from.row, move.to.col);
-      board.setPiece(capturePos, record.capturedPiece);
-    }
-
-    // Handle castling undo
+    // Restore castling rook using the stored original column.
     if (move.isCastling) {
       final isKingside = move.to.col > move.from.col;
-      final rookFromCol = isKingside ? move.to.col - 1 : move.to.col + 1;
-      final rookToCol = isKingside ? board.size - 1 : 0;
-      final rook = board.removePiece(Position(move.from.row, rookFromCol));
+      final rookCurrentCol =
+          isKingside ? move.to.col - 1 : move.to.col + 1;
+      final rookOriginalCol =
+          record.rookOriginalCol ?? (isKingside ? board.size - 1 : 0);
+      final rook =
+          board.removePiece(Position(move.from.row, rookCurrentCol));
       if (rook != null) {
         rook.hasMoved = false;
-        board.setPiece(Position(move.from.row, rookToCol), rook);
+        board.setPiece(Position(move.from.row, rookOriginalCol), rook);
       }
     }
 
-    // Restore en passant target
+    // Restore en passant target.
     board.enPassantTarget = record.previousEnPassant;
 
-    // Switch turn back
-    currentTurn = currentTurn.opposite;
-
-    // Update move number
-    if (currentTurn == PieceColor.black) {
-      fullMoveNumber--;
+    // Restore variant-specific data.
+    if (record.previousVariantData != null) {
+      variantData = Map<String, dynamic>.from(record.previousVariantData!);
     }
 
     result = GameResult.ongoing;
-
     return true;
   }
 
-  /// Check for checkmate, stalemate, or draws
+  /// Check for checkmate, stalemate, or draws using variant-aware move gen.
   void _updateGameResult() {
-    final legalMoves = board.getAllLegalMoves(currentTurn);
+    final legalMoves = getAllLegalMoves(currentTurn);
 
     if (legalMoves.isEmpty) {
       if (board.isInCheck(currentTurn)) {
@@ -226,26 +347,39 @@ class GameState {
     }
   }
 
-  /// Check for insufficient mating material
+  /// Check for insufficient mating material.
   bool _isInsufficientMaterial() {
     final whitePieces = board.getPieces(PieceColor.white);
     final blackPieces = board.getPieces(PieceColor.black);
 
+    // Horde: white has many pawns — not insufficient.
+    if (whitePieces.isEmpty || blackPieces.isEmpty) return false;
+
     if (whitePieces.length == 1 && blackPieces.length == 1) return true;
 
     if (whitePieces.length == 1 && blackPieces.length == 2) {
-      final piece = blackPieces.firstWhere((p) => p.$2.symbol != 'K').$2;
+      final piece =
+          blackPieces.firstWhere((p) => p.$2.symbol != 'K').$2;
       if (piece.symbol == 'N' || piece.symbol == 'B') return true;
     }
     if (blackPieces.length == 1 && whitePieces.length == 2) {
-      final piece = whitePieces.firstWhere((p) => p.$2.symbol != 'K').$2;
+      final piece =
+          whitePieces.firstWhere((p) => p.$2.symbol != 'K').$2;
       if (piece.symbol == 'N' || piece.symbol == 'B') return true;
     }
 
     return false;
   }
 
-  /// Get algebraic notation for move history
+  /// Fallback piece creation when no variant is set (standard pieces only).
+  Piece _fallbackCreatePiece(String symbol, PieceColor color) {
+    // Lazy import via reflection isn't possible; variants always provide this.
+    // This path should never be reached in normal gameplay.
+    throw StateError(
+        'Cannot create piece "$symbol" without a variant. '
+        'Ensure createNewGame() sets the variant.');
+  }
+
   String getMoveHistoryNotation() {
     final buffer = StringBuffer();
     for (int i = 0; i < moveHistory.length; i++) {
@@ -258,11 +392,9 @@ class GameState {
     return buffer.toString().trim();
   }
 
-  /// Export position to FEN-like notation (extended for 10x10 boards).
   String toFEN() {
     final buffer = StringBuffer();
 
-    // Board position
     for (int row = 0; row < board.size; row++) {
       int emptyCount = 0;
       for (int col = 0; col < board.size; col++) {
@@ -280,44 +412,37 @@ class GameState {
           buffer.write(symbol);
         }
       }
-      if (emptyCount > 0) {
-        buffer.write(emptyCount);
-      }
-      if (row < board.size - 1) {
-        buffer.write('/');
-      }
+      if (emptyCount > 0) buffer.write(emptyCount);
+      if (row < board.size - 1) buffer.write('/');
     }
 
-    // Active color
     buffer.write(' ');
     buffer.write(currentTurn == PieceColor.white ? 'w' : 'b');
 
-    // Castling availability (simplified - just check if king/rooks have moved)
     buffer.write(' ');
     String castling = '';
     final whiteKingPos = board.findKing(PieceColor.white);
     if (whiteKingPos != null) {
       final whiteKing = board.getPiece(whiteKingPos);
       if (whiteKing != null && !whiteKing.hasMoved) {
-        final kingsideRook = board.getPiece(Position(board.size - 1, board.size - 1));
-        final queensideRook = board.getPiece(Position(board.size - 1, 0));
-        if (kingsideRook != null && !kingsideRook.hasMoved) castling += 'K';
-        if (queensideRook != null && !queensideRook.hasMoved) castling += 'Q';
+        final ksr = board.getPiece(Position(board.size - 1, board.size - 1));
+        final qsr = board.getPiece(Position(board.size - 1, 0));
+        if (ksr != null && !ksr.hasMoved) castling += 'K';
+        if (qsr != null && !qsr.hasMoved) castling += 'Q';
       }
     }
     final blackKingPos = board.findKing(PieceColor.black);
     if (blackKingPos != null) {
       final blackKing = board.getPiece(blackKingPos);
       if (blackKing != null && !blackKing.hasMoved) {
-        final kingsideRook = board.getPiece(Position(0, board.size - 1));
-        final queensideRook = board.getPiece(Position(0, 0));
-        if (kingsideRook != null && !kingsideRook.hasMoved) castling += 'k';
-        if (queensideRook != null && !queensideRook.hasMoved) castling += 'q';
+        final ksr = board.getPiece(Position(0, board.size - 1));
+        final qsr = board.getPiece(Position(0, 0));
+        if (ksr != null && !ksr.hasMoved) castling += 'k';
+        if (qsr != null && !qsr.hasMoved) castling += 'q';
       }
     }
     buffer.write(castling.isEmpty ? '-' : castling);
 
-    // En passant target
     buffer.write(' ');
     if (board.enPassantTarget != null) {
       buffer.write(board.enPassantTarget!.toAlgebraic(board.size));
@@ -325,17 +450,13 @@ class GameState {
       buffer.write('-');
     }
 
-    // Half-move clock and full-move number
     buffer.write(' $halfMoveClock $fullMoveNumber');
-
     return buffer.toString();
   }
 
-  /// Export game to PGN format.
   String toPGN() {
     final buffer = StringBuffer();
 
-    // Headers
     buffer.writeln('[Event "${event ?? "Casual Game"}"]');
     buffer.writeln('[Site "${site ?? "WeirdChess App"}"]');
     buffer.writeln('[Date "${date ?? _formatDate(DateTime.now())}"]');
@@ -346,7 +467,6 @@ class GameState {
     buffer.writeln('[BoardSize "${board.size}x${board.size}"]');
     buffer.writeln();
 
-    // Moves
     final moves = StringBuffer();
     for (int i = 0; i < moveHistory.length; i++) {
       if (i % 2 == 0) {
@@ -356,46 +476,30 @@ class GameState {
       final record = moveHistory[i];
       final move = record.move;
 
-      // Build move notation
       String notation = '';
       if (move.isCastling) {
         notation = move.to.col > move.from.col ? 'O-O' : 'O-O-O';
       } else {
-        // Piece symbol (skip for pawns)
         final pieceName = record.pieceName ?? 'Pawn';
-        if (pieceName != 'Pawn') {
-          notation += pieceName[0];
-        }
-        // Capture indicator
+        if (pieceName != 'Pawn') notation += pieceName[0];
         if (move.isCapture) {
-          if (pieceName == 'Pawn') {
-            notation += move.from.toAlgebraic(board.size)[0];
-          }
+          if (pieceName == 'Pawn') notation += move.from.toAlgebraic(board.size)[0];
           notation += 'x';
         }
-        // Destination
         notation += move.to.toAlgebraic(board.size);
-        // Promotion
-        if (move.promotionPiece != null) {
-          notation += '=${move.promotionPiece}';
-        }
+        if (move.promotionPiece != null) notation += '=${move.promotionPiece}';
       }
 
       moves.write('$notation ');
 
-      // Line wrap at 80 chars
       if (moves.length > 70 && i % 2 == 1) {
         buffer.writeln(moves.toString().trim());
         moves.clear();
       }
     }
 
-    if (moves.isNotEmpty) {
-      buffer.write(moves.toString().trim());
-    }
-
+    if (moves.isNotEmpty) buffer.write(moves.toString().trim());
     buffer.write(' ${result.pgnResult}');
-
     return buffer.toString();
   }
 
@@ -403,7 +507,6 @@ class GameState {
     return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
   }
 
-  /// Serialize game state to JSON for saving.
   String toJson() {
     return jsonEncode({
       'variantName': variantName,
@@ -414,6 +517,7 @@ class GameState {
       'fullMoveNumber': fullMoveNumber,
       'fen': toFEN(),
       'moveHistory': moveHistory.map((r) => r.toJson()).toList(),
+      'variantData': variantData,
       'event': event,
       'site': site,
       'date': date,
@@ -423,7 +527,6 @@ class GameState {
     });
   }
 
-  /// Create a copy of the game state
   GameState copy() {
     return GameState(
       board: board.copy(),
@@ -435,6 +538,8 @@ class GameState {
       result: result,
       halfMoveClock: halfMoveClock,
       fullMoveNumber: fullMoveNumber,
+      variant: variant,
+      variantData: Map<String, dynamic>.from(variantData),
       event: event,
       site: site,
       date: date,
@@ -443,10 +548,8 @@ class GameState {
     );
   }
 
-  /// Check if the game is over
   bool get isGameOver => result != GameResult.ongoing;
 
-  /// Get the winner color (if any)
   PieceColor? get winner {
     switch (result) {
       case GameResult.whiteWins:

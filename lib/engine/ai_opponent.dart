@@ -43,7 +43,7 @@ class AIOpponent {
   Future<Move?> findBestMove(GameState state) async {
     if (state.isGameOver) return null;
 
-    final legalMoves = state.board.getAllLegalMoves(state.currentTurn);
+    final legalMoves = state.getAllLegalMoves(state.currentTurn);
     if (legalMoves.isEmpty) return null;
 
     // Beginner mode: sometimes make random moves

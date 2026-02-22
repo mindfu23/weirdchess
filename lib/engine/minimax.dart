@@ -101,7 +101,7 @@ class MinimaxEngine {
       return (score, null);
     }
 
-    final moves = state.board.getAllLegalMoves(state.currentTurn);
+    final moves = state.getAllLegalMoves(state.currentTurn);
     if (moves.isEmpty) {
       final score = evaluator.evaluate(state);
       _tt.store(

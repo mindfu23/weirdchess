@@ -4,7 +4,7 @@ import '../../core/move.dart';
 import '../../services/game_service.dart';
 import 'piece_widget.dart';
 
-/// Widget that displays the chess board
+/// Widget that displays the chess board.
 class BoardWidget extends ConsumerWidget {
   const BoardWidget({super.key});
 
@@ -58,19 +58,27 @@ class _SquareWidget extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gameState = ref.watch(gameNotifierProvider);
     final notifier = ref.watch(gameNotifierProvider.notifier);
-    final piece = gameState.board.getPiece(position);
 
     final isLight = (position.row + position.col) % 2 == 0;
     final squareColor = isLight ? lightColor : darkColor;
 
-    // Check if this square is selected or a valid move
+    // Fog of War: compute fogged squares for the current player.
+    final foggedSquares = notifier.foggedSquares;
+    final isInFog = foggedSquares?.contains(position) ?? false;
+
+    // Hide opponent pieces that are in fog.
+    final rawPiece = gameState.board.getPiece(position);
+    final piece = (isInFog && rawPiece?.color != gameState.currentTurn)
+        ? null
+        : rawPiece;
+
+    // Check if this square is selected or a valid move destination.
     final isSelected = notifier.selectedPosition == position;
     final isValidMove = notifier.selectedPieceMoves.any((m) => m.to == position);
     final moveForSquare = isValidMove
         ? notifier.selectedPieceMoves.firstWhere((m) => m.to == position)
         : null;
 
-    // Highlight colors
     Color? highlightColor;
     if (isSelected) {
       highlightColor = Colors.yellow.withAlpha(128);
@@ -80,7 +88,6 @@ class _SquareWidget extends ConsumerWidget {
           : Colors.green.withAlpha(102);
     }
 
-    // Check if this was the last move
     final lastMove = gameState.moveHistory.isNotEmpty
         ? gameState.moveHistory.last.move
         : null;
@@ -103,8 +110,9 @@ class _SquareWidget extends ConsumerWidget {
               Positioned.fill(
                 child: Container(color: highlightColor),
               ),
-            // Move indicator dot (for empty squares)
-            if (isValidMove && piece == null)
+
+            // Move indicator dot (empty squares not in fog)
+            if (isValidMove && piece == null && !isInFog)
               Center(
                 child: Container(
                   width: 16,
@@ -115,6 +123,7 @@ class _SquareWidget extends ConsumerWidget {
                   ),
                 ),
               ),
+
             // Piece
             if (piece != null)
               Center(
@@ -123,6 +132,27 @@ class _SquareWidget extends ConsumerWidget {
                     final pieceSize = constraints.maxWidth * 0.8;
                     return PieceWidget(piece: piece, size: pieceSize);
                   },
+                ),
+              ),
+
+            // Fog overlay — drawn on top to obscure unknown squares
+            if (isInFog)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black.withAlpha(160),
+                ),
+              ),
+
+            // Faint dot for moves into fog (player knows they can move there)
+            if (isValidMove && isInFog)
+              Center(
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withAlpha(80),
+                  ),
                 ),
               ),
           ],
