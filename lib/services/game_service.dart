@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/game_state.dart';
 import '../core/move.dart';
 import '../core/piece.dart';
@@ -26,12 +27,31 @@ final variantsProvider = Provider<List<ChessVariant>>((ref) {
   ];
 });
 
-/// Selected variant notifier
+/// Selected variant notifier — persists the last-chosen variant across reloads.
 class SelectedVariantNotifier extends Notifier<ChessVariant> {
-  @override
-  ChessVariant build() => StandardChess();
+  static const _prefKey = 'selected_variant_id';
 
-  void select(ChessVariant variant) => state = variant;
+  @override
+  ChessVariant build() {
+    _restoreSaved();
+    return GrandChess(); // Shown briefly until SharedPreferences responds
+  }
+
+  /// Load the previously saved variant ID and switch to it if found.
+  Future<void> _restoreSaved() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedId = prefs.getString(_prefKey);
+    if (savedId == null) return;
+    final variants = ref.read(variantsProvider);
+    final match = variants.where((v) => v.id == savedId);
+    if (match.isNotEmpty) state = match.first;
+  }
+
+  void select(ChessVariant variant) {
+    state = variant;
+    SharedPreferences.getInstance()
+        .then((prefs) => prefs.setString(_prefKey, variant.id));
+  }
 }
 
 final selectedVariantProvider =
