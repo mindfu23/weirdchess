@@ -44,7 +44,7 @@ class GameScreen extends ConsumerWidget {
                         .withAlpha(100),
               ),
               label: Text(
-                'Random pigeon attack',
+                chaosEnabled ? 'Random pigeon attack' : 'Random pigeon attack off',
                 style: TextStyle(
                   fontSize: 12,
                   color: chaosEnabled

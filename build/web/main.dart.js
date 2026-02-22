@@ -90550,7 +90550,7 @@ d1(){return B.fE}}
 A.nE.prototype={
 d1(){return!0}}
 A.mL.prototype={
-d1(){return!1}}
+d1(){return!0}}
 A.qE.prototype={}
 A.nC.prototype={
 d1(){return null}}
@@ -91069,18 +91069,19 @@ WK(a,b){return new A.ih(this.a,!0,!1)}}
 A.mR.prototype={
 d1(){return B.nO}}
 A.ue.prototype={
-kJ(a,b){var s,r,q=null,p=b.ep($.oZ(),t.Mr),o=b.ep($.axs(),t.qg),n=b.ep($.axu(),t.y),m=b.ep($.aBs(),t.A_),l=A.bD(p.gc0(),q,q,q,q,q,q),k=A.uj(q,q,q,B.oR,q,q,new A.a6m(a),q,q,q,q),j=t.p,i=A.b([],j)
-if(p.gj8()==="standard_chess"){if(n)s=A.J(a).ax.b
+kJ(a,b){var s,r,q,p=null,o=b.ep($.oZ(),t.Mr),n=b.ep($.axs(),t.qg),m=b.ep($.axu(),t.y),l=b.ep($.aBs(),t.A_),k=A.bD(o.gc0(),p,p,p,p,p,p),j=A.uj(p,p,p,B.oR,p,p,new A.a6m(a),p,p,p,p),i=t.p,h=A.b([],i)
+if(o.gj8()==="standard_chess"){if(m)s=A.J(a).ax.b
 else{s=A.J(a).ax.k3
-s=A.ae(100,s.v()>>>16&255,s.v()>>>8&255,s.v()&255)}s=A.q0(B.Hf,s,q,18)
-if(n)r=A.J(a).ax.b
-else{r=A.J(a).ax.k3
-r=A.ae(100,r.v()>>>16&255,r.v()>>>8&255,r.v()&255)}i.push(A.aFx(s,A.bD("Random pigeon attack",q,q,q,A.dV(q,q,r,q,q,q,q,q,q,q,q,12,q,q,q,q,q,!0,q,q,q,q,q,q,q,q),q,q),new A.a6n(b)))}i.push(new A.v5(new A.a6o(this,o),new A.a6p(b),"AI Difficulty",B.HO,q,t.RQ))
-i.push(A.uj(q,q,q,B.HP,q,q,new A.a6q(this,a,p),q,q,q,"Rules"))
-l=A.a0J(i,q,k,l)
-j=A.b([this.a7E(a),B.PQ],j)
-if(m!=null)j.push(A.az3(0,new A.Bv(m,q)))
-return A.agB(l,A.r3(!0,A.o6(B.cQ,j,B.a2,B.cH),B.ay,!0))},
+s=A.ae(100,s.v()>>>16&255,s.v()>>>8&255,s.v()&255)}s=A.q0(B.Hf,s,p,18)
+r=m?"Random pigeon attack":"Random pigeon attack off"
+if(m)q=A.J(a).ax.b
+else{q=A.J(a).ax.k3
+q=A.ae(100,q.v()>>>16&255,q.v()>>>8&255,q.v()&255)}h.push(A.aFx(s,A.bD(r,p,p,p,A.dV(p,p,q,p,p,p,p,p,p,p,p,12,p,p,p,p,p,!0,p,p,p,p,p,p,p,p),p,p),new A.a6n(b)))}h.push(new A.v5(new A.a6o(this,n),new A.a6p(b),"AI Difficulty",B.HO,p,t.RQ))
+h.push(A.uj(p,p,p,B.HP,p,p,new A.a6q(this,a,o),p,p,p,"Rules"))
+k=A.a0J(h,p,j,k)
+i=A.b([this.a7E(a),B.PQ],i)
+if(l!=null)i.push(A.az3(0,new A.Bv(l,p)))
+return A.agB(k,A.r3(!0,A.o6(B.cQ,i,B.a2,B.cH),B.ay,!0))},
 a7E(a){return A.ayK(new A.a6i())},
 xF(a,b,c){var s=null,r=A.b([],t.p)
 if(a===c)r.push(B.HI)

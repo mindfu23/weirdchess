@@ -91,7 +91,7 @@ final playingAgainstAIProvider =
 /// Chaos (pigeon) mode toggle — Standard Chess only
 class ChaosModeNotifier extends Notifier<bool> {
   @override
-  bool build() => false;
+  bool build() => true;
 
   void toggle() => state = !state;
 }
