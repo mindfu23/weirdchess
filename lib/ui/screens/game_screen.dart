@@ -117,7 +117,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/'),
+          onPressed: () =>
+              context.go('/?tab=${variant.boardSize == 10 ? 1 : 0}'),
         ),
         actions: [
           // Pigeon chaos toggle — Standard Chess only.

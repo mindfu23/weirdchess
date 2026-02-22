@@ -9,18 +9,42 @@ import '../../variants/variant_base.dart';
 /// Home screen with variant selection.
 /// Two tabs — 8×8 (default) and 10×10 — replace the old section-header scroll.
 /// Content is centre-clamped to 460 px so cards don't balloon on wide screens.
-class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+class HomeScreen extends ConsumerStatefulWidget {
+  final int initialTab;
+
+  const HomeScreen({super.key, this.initialTab = 0});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.initialTab.clamp(0, 1),
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final variants = ref.watch(variantsProvider);
     final variants8x8 = variants.where((v) => v.boardSize == 8).toList();
     final variants10x10 = variants.where((v) => v.boardSize == 10).toList();
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: const Color(0xFF1A1A1A),
         appBar: AppBar(
           backgroundColor: const Color(0xFF1A1A1A),
@@ -86,6 +110,7 @@ class HomeScreen extends ConsumerWidget {
 
                   // Tab bar — left-aligned, with size + layout description
                   TabBar(
+                    controller: _tabController,
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
                     labelColor: const Color(0xFFFF9B8A),
@@ -144,6 +169,7 @@ class HomeScreen extends ConsumerWidget {
                   // Tab content
                   Expanded(
                     child: TabBarView(
+                      controller: _tabController,
                       children: [
                         _VariantGrid(variants: variants8x8),
                         _VariantGrid(variants: variants10x10),
@@ -155,7 +181,6 @@ class HomeScreen extends ConsumerWidget {
             ),
           ),
         ),
-      ),
     );
   }
 }

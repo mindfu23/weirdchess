@@ -18,7 +18,12 @@ final _router = GoRouter(
   routes: [
     GoRoute(
       path: '/',
-      builder: (context, state) => const HomeScreen(),
+      builder: (context, state) {
+        final tab = int.tryParse(
+                state.uri.queryParameters['tab'] ?? '') ??
+            0;
+        return HomeScreen(initialTab: tab);
+      },
     ),
     GoRoute(
       path: '/game',
