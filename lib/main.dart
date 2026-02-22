@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -68,6 +69,12 @@ class _WeirdChessAppState extends ConsumerState<WeirdChessApp> {
     llmNotifier.setProviderWithModel(config.provider, config.currentModel);
     llmNotifier.setEnabled(config.commentaryEnabled);
     llmNotifier.setDirectMode(config.directMode);
+    // On mobile, the Netlify function URL is a relative path with no host —
+    // force direct mode so commentary silently does nothing unless the user
+    // has entered their own API key in Settings.
+    if (!kIsWeb) {
+      llmNotifier.setDirectMode(true);
+    }
   }
 
   @override
