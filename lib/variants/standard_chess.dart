@@ -14,7 +14,7 @@ class StandardChess extends ChessVariant {
   String get name => 'Standard Chess';
 
   @override
-  String get description => 'Classic 8x8 chess with standard rules';
+  String get description => 'Classic 8x8 chess with standard rules but random pigeon attacks';
 
   @override
   int get boardSize => 8;

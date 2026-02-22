@@ -91674,7 +91674,7 @@ gpG(){return A.af(["K",B.hZ,"Q",B.lm,"R",B.lk,"B",B.ll,"N",B.lj,"Ch",B.Pf,"W",B.
 A.Qh.prototype={
 gj8(){return"standard_chess"},
 gc0(){return"Standard Chess"},
-grl(){return"Classic 8x8 chess with standard rules"},
+grl(){return"Classic 8x8 chess with standard rules but random pigeon attacks"},
 goC(){return 8},
 gpo(){return B.nk},
 goO(){return B.nC},
