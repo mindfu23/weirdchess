@@ -29,7 +29,7 @@ final variantsProvider = Provider<List<ChessVariant>>((ref) {
 /// Selected variant notifier
 class SelectedVariantNotifier extends Notifier<ChessVariant> {
   @override
-  ChessVariant build() => GrandChess();
+  ChessVariant build() => StandardChess();
 
   void select(ChessVariant variant) => state = variant;
 }
