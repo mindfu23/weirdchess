@@ -30,34 +30,29 @@ class GameScreen extends ConsumerWidget {
         actions: [
           // Pigeon chaos toggle — Standard Chess only.
           if (variant.id == 'standard_chess')
-            Tooltip(
-              message: chaosEnabled
-                  ? 'Pigeon Mode: ON — tap to disable'
-                  : 'Pigeon Mode: OFF — tap to enable',
-              child: TextButton.icon(
-                onPressed: () =>
-                    ref.read(chaosModeProvider.notifier).toggle(),
-                icon: Icon(
-                  Icons.shuffle,
-                  size: 18,
+            TextButton.icon(
+              onPressed: () =>
+                  ref.read(chaosModeProvider.notifier).toggle(),
+              icon: Icon(
+                Icons.air,
+                size: 18,
+                color: chaosEnabled
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withAlpha(100),
+              ),
+              label: Text(
+                'Toggle for a random pigeon attack on the chessboard.',
+                style: TextStyle(
+                  fontSize: 12,
                   color: chaosEnabled
                       ? Theme.of(context).colorScheme.primary
                       : Theme.of(context)
                           .colorScheme
                           .onSurface
                           .withAlpha(100),
-                ),
-                label: Text(
-                  'Pigeon',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: chaosEnabled
-                        ? Theme.of(context).colorScheme.primary
-                        : Theme.of(context)
-                            .colorScheme
-                            .onSurface
-                            .withAlpha(100),
-                  ),
                 ),
               ),
             ),
