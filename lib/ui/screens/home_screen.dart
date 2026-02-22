@@ -64,7 +64,7 @@ class HomeScreen extends ConsumerWidget {
                   const Padding(
                     padding: EdgeInsets.fromLTRB(20, 16, 20, 4),
                     child: Text(
-                      'Choose a Weirdness',
+                      'Choose your weird chess battle',
                       style: TextStyle(
                         fontFamily: 'Righteous',
                         color: Color(0xFFF5E6D3),

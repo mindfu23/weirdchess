@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/piece.dart';
 import '../../services/game_service.dart';
 
+// ── Brand palette ────────────────────────────────────────────────────────────
+const _kSurface = Color(0xFF2D3542);
+const _kTextPrimary = Color(0xFFF5E6D3);
+const _kTextMuted = Color(0xFF9B8E85);
+
 /// Panel that displays information about the currently selected piece.
 /// Positioned via parent widget for easy relocation during UI upgrades.
 class PieceInfoPanel extends ConsumerWidget {
@@ -15,19 +20,13 @@ class PieceInfoPanel extends ConsumerWidget {
     final variant = ref.watch(selectedVariantProvider);
 
     final selectedPos = notifier.selectedPosition;
-    if (selectedPos == null) {
-      return const SizedBox.shrink();
-    }
+    if (selectedPos == null) return const SizedBox.shrink();
 
     final piece = gameState.board.getPiece(selectedPos);
-    if (piece == null) {
-      return const SizedBox.shrink();
-    }
+    if (piece == null) return const SizedBox.shrink();
 
     final pieceInfo = variant.pieceInfo[piece.symbol];
-    if (pieceInfo == null) {
-      return const SizedBox.shrink();
-    }
+    if (pieceInfo == null) return const SizedBox.shrink();
 
     return PieceInfoCard(
       piece: piece,
@@ -64,6 +63,7 @@ class PieceInfoCard extends StatelessWidget {
 
     return Card(
       elevation: 4,
+      color: _kSurface,
       child: Container(
         constraints: const BoxConstraints(maxWidth: 220),
         padding: const EdgeInsets.all(12),
@@ -85,13 +85,14 @@ class PieceInfoCard extends StatelessWidget {
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
+                          color: _kTextPrimary,
                         ),
                       ),
                       Text(
                         '$colorName · Value: $value',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
-                          color: Colors.grey[600],
+                          color: _kTextMuted,
                         ),
                       ),
                     ],
@@ -99,20 +100,20 @@ class PieceInfoCard extends StatelessWidget {
                 ),
               ],
             ),
-            const Divider(height: 16),
+            const Divider(height: 16, color: Color(0xFF4A5568)),
             // Movement description
-            Text(
+            const Text(
               'Movement',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Colors.grey[700],
+                color: _kTextMuted,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               movementDescription,
-              style: const TextStyle(fontSize: 13),
+              style: const TextStyle(fontSize: 13, color: _kTextPrimary),
             ),
           ],
         ),
@@ -126,9 +127,10 @@ class PieceInfoCard extends StatelessWidget {
       height: 36,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isWhite ? Colors.white : Colors.grey[800],
+        // White piece: white fill, dark border; Black piece: dark fill, light border.
+        color: isWhite ? Colors.white : const Color(0xFF1A1A1A),
         border: Border.all(
-          color: isWhite ? Colors.grey[800]! : Colors.white,
+          color: isWhite ? const Color(0xFF4A5568) : _kTextMuted,
           width: 2,
         ),
       ),
@@ -136,7 +138,7 @@ class PieceInfoCard extends StatelessWidget {
         child: Text(
           symbol,
           style: TextStyle(
-            color: isWhite ? Colors.grey[800] : Colors.white,
+            color: isWhite ? const Color(0xFF1A1A1A) : Colors.white,
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),

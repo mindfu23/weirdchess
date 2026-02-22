@@ -4,6 +4,13 @@ import '../../core/game_state.dart';
 import '../../core/piece.dart';
 import '../../services/game_service.dart';
 
+// ── Brand palette (mirrors home_screen / main.dart theme) ──────────────────
+const _kBackground = Color(0xFF1A1A1A);
+const _kSurface = Color(0xFF2D3542);
+const _kTextPrimary = Color(0xFFF5E6D3);
+const _kTextMuted = Color(0xFF9B8E85);
+const _kAccent = Color(0xFFFF9B8A);
+
 /// Panel showing game status, captured pieces, and controls
 class ScorePanel extends ConsumerWidget {
   const ScorePanel({super.key});
@@ -16,8 +23,8 @@ class ScorePanel extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.grey[200],
-        borderRadius: BorderRadius.circular(8),
+        color: _kSurface,
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -39,7 +46,7 @@ class ScorePanel extends ConsumerWidget {
           // Move counter
           Text(
             'Move ${gameState.fullMoveNumber}',
-            style: const TextStyle(fontSize: 14, color: Colors.grey),
+            style: const TextStyle(fontSize: 14, color: _kTextMuted),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
@@ -84,16 +91,17 @@ class ScorePanel extends ConsumerWidget {
             shape: BoxShape.circle,
             color: gameState.currentTurn == PieceColor.white
                 ? Colors.white
-                : Colors.grey[800],
-            border: Border.all(color: Colors.grey[600]!, width: 2),
+                : _kBackground,
+            border: Border.all(color: _kTextMuted, width: 2),
           ),
         ),
         const SizedBox(width: 8),
         Text(
-          isAIThinking ? 'AI thinking...' : turnText,
+          isAIThinking ? 'AI thinking…' : turnText,
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
+            color: _kTextPrimary,
           ),
         ),
         if (isAIThinking) ...[
@@ -101,7 +109,10 @@ class ScorePanel extends ConsumerWidget {
           const SizedBox(
             width: 16,
             height: 16,
-            child: CircularProgressIndicator(strokeWidth: 2),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: _kAccent,
+            ),
           ),
         ],
       ],
@@ -115,19 +126,19 @@ class ScorePanel extends ConsumerWidget {
     switch (gameState.result) {
       case GameResult.whiteWins:
         resultText = 'White wins by checkmate!';
-        resultColor = Colors.green;
+        resultColor = const Color(0xFF4CAF82);
         break;
       case GameResult.blackWins:
         resultText = 'Black wins by checkmate!';
-        resultColor = Colors.red;
+        resultColor = const Color(0xFFFF6B6B);
         break;
       case GameResult.stalemate:
-        resultText = 'Stalemate - Draw!';
-        resultColor = Colors.orange;
+        resultText = 'Stalemate — Draw!';
+        resultColor = _kAccent;
         break;
       case GameResult.draw:
         resultText = 'Draw!';
-        resultColor = Colors.orange;
+        resultColor = _kAccent;
         break;
       default:
         return const SizedBox.shrink();
@@ -136,9 +147,9 @@ class ScorePanel extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: resultColor.withAlpha(51),
+        color: resultColor.withAlpha(38),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: resultColor),
+        border: Border.all(color: resultColor.withAlpha(128)),
       ),
       child: Text(
         resultText,
@@ -171,7 +182,7 @@ class ScorePanel extends ConsumerWidget {
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 12, color: Colors.grey),
+          style: const TextStyle(fontSize: 12, color: _kTextMuted),
         ),
         const SizedBox(width: 8),
         Expanded(
@@ -182,9 +193,10 @@ class ScorePanel extends ConsumerWidget {
                       p.symbol,
                       style: TextStyle(
                         fontSize: 14,
+                        // White pieces shown cream; black pieces slightly muted.
                         color: p.color == PieceColor.white
-                            ? Colors.grey[600]
-                            : Colors.grey[800],
+                            ? _kTextPrimary
+                            : _kTextMuted,
                         fontWeight: FontWeight.bold,
                       ),
                     ))
