@@ -28,21 +28,19 @@ class GameScreen extends ConsumerWidget {
           onPressed: () => context.go('/'),
         ),
         actions: [
-          // Pigeon chaos toggle — Standard Chess only
+          // Pigeon chaos toggle — Standard Chess only.
+          // Uses a stack of two icons (feather + scatter) so no emoji font
+          // is required, which avoids Flutter web Noto font warnings.
           if (variant.id == 'standard_chess')
             IconButton(
-              icon: Text(
-                '🕊️',
-                style: TextStyle(
-                  fontSize: 20,
-                  // Dimmed when off so the active state is obvious
-                  color: chaosEnabled
-                      ? null
-                      : Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withAlpha(80),
-                ),
+              icon: Icon(
+                Icons.air, // evokes something sweeping across the board
+                color: chaosEnabled
+                    ? Theme.of(context).colorScheme.primary
+                    : Theme.of(context)
+                        .colorScheme
+                        .onSurface
+                        .withAlpha(80),
               ),
               tooltip: chaosEnabled
                   ? 'Pigeon Mode: ON — tap to disable'
