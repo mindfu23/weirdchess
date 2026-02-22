@@ -5,9 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../services/game_service.dart';
 import '../../variants/variant_base.dart';
 
-/// Home screen with variant selection — 2-column grid with section headers
-/// for 8×8 and 10×10 variants.  Content is centre-clamped to 460 px so
-/// cards don't balloon on wide/desktop screens.
+/// Home screen with variant selection.
+/// Two tabs — 8×8 (default) and 10×10 — replace the old section-header scroll.
+/// Content is centre-clamped to 460 px so cards don't balloon on wide screens.
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
@@ -17,143 +17,106 @@ class HomeScreen extends ConsumerWidget {
     final variants8x8 = variants.where((v) => v.boardSize == 8).toList();
     final variants10x10 = variants.where((v) => v.boardSize == 10).toList();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF1A1A1A),
-      appBar: AppBar(
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
         backgroundColor: const Color(0xFF1A1A1A),
-        elevation: 0,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SvgPicture.asset(
-              'assets/images/mascot.svg',
-              width: 36,
-              height: 36,
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'WeirdChess',
-              style: const TextStyle(
-                fontFamily: 'Righteous',
-                color: Color(0xFFF5E6D3),
-                fontSize: 24,
+        appBar: AppBar(
+          backgroundColor: const Color(0xFF1A1A1A),
+          elevation: 0,
+          // Left-aligned logo + title
+          centerTitle: false,
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SvgPicture.asset(
+                'assets/images/mascot.svg',
+                width: 36,
+                height: 36,
               ),
+              const SizedBox(width: 10),
+              const Text(
+                'WeirdChess',
+                style: TextStyle(
+                  fontFamily: 'Righteous',
+                  color: Color(0xFFF5E6D3),
+                  fontSize: 24,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings, color: Color(0xFFFF9B8A)),
+              tooltip: 'Settings',
+              onPressed: () => context.go('/settings'),
             ),
           ],
         ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings, color: Color(0xFFFF9B8A)),
-            tooltip: 'Settings',
-            onPressed: () => context.go('/settings'),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            // Clamp to phone-like width so cards don't stretch on wide screens.
-            constraints: const BoxConstraints(maxWidth: 460),
-            child: CustomScrollView(
-              slivers: [
-                // Header
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 16, 20, 4),
+                    child: Text(
+                      'Choose a Weirdness',
+                      style: TextStyle(
+                        fontFamily: 'Righteous',
+                        color: Color(0xFFF5E6D3),
+                        fontSize: 20,
+                      ),
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(20, 0, 20, 12),
+                    child: Text(
+                      'classic rules and wild twists',
+                      style: TextStyle(
+                        color: Color(0xFF9B8E85),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+
+                  // Tab bar
+                  const TabBar(
+                    labelColor: Color(0xFFFF9B8A),
+                    unselectedLabelColor: Color(0xFF9B8E85),
+                    indicatorColor: Color(0xFFFF9B8A),
+                    indicatorSize: TabBarIndicatorSize.label,
+                    dividerColor: Color(0xFF2D3542),
+                    labelStyle: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                    unselectedLabelStyle: TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                    tabs: [
+                      Tab(text: '8×8'),
+                      Tab(text: '10×10'),
+                    ],
+                  ),
+
+                  // Tab content
+                  Expanded(
+                    child: TabBarView(
                       children: [
-                        const Text(
-                          'Choose a Variant',
-                          style: TextStyle(
-                            fontFamily: 'Righteous',
-                            color: Color(0xFFF5E6D3),
-                            fontSize: 20,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${variants.length} variants — classic rules and wild twists',
-                          style: const TextStyle(
-                            color: Color(0xFF9B8E85),
-                            fontSize: 13,
-                          ),
-                        ),
+                        _VariantGrid(variants: variants8x8),
+                        _VariantGrid(variants: variants10x10),
                       ],
                     ),
                   ),
-                ),
-
-                // ── 8×8 section ───────────────────────────────────────────
-                _SectionHeader(
-                  label: '8×8 Variants',
-                  count: variants8x8.length,
-                ),
-                _VariantGrid(variants: variants8x8),
-
-                // ── 10×10 section ─────────────────────────────────────────
-                _SectionHeader(
-                  label: '10×10 Variants',
-                  count: variants10x10.length,
-                ),
-                _VariantGrid(variants: variants10x10),
-
-                const SliverToBoxAdapter(child: SizedBox(height: 24)),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  final int count;
-
-  const _SectionHeader({required this.label, required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-        child: Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFFFF9B8A),
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.8,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFF2D3542),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '$count',
-                style: const TextStyle(
-                  color: Color(0xFF9B8E85),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Divider(color: Color(0xFF2D3542), thickness: 1),
-            ),
-          ],
         ),
       ),
     );
@@ -167,35 +130,26 @@ class _VariantGrid extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return SliverPadding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          // Fixed height per card — compact without the board preview.
-          mainAxisExtent: 112,
-        ),
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            final variant = variants[index];
-            return _VariantCard(
-              variant: variant,
-              onTap: () {
-                ref
-                    .read(selectedVariantProvider.notifier)
-                    .select(variant);
-                ref
-                    .read(gameNotifierProvider.notifier)
-                    .newGame(variant);
-                context.go('/game');
-              },
-            );
-          },
-          childCount: variants.length,
-        ),
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        mainAxisExtent: 112,
       ),
+      itemCount: variants.length,
+      itemBuilder: (context, index) {
+        final variant = variants[index];
+        return _VariantCard(
+          variant: variant,
+          onTap: () {
+            ref.read(selectedVariantProvider.notifier).select(variant);
+            ref.read(gameNotifierProvider.notifier).newGame(variant);
+            context.go('/game');
+          },
+        );
+      },
     );
   }
 }
@@ -206,7 +160,6 @@ class _VariantCard extends StatelessWidget {
 
   const _VariantCard({required this.variant, required this.onTap});
 
-  /// Returns a Material icon that best represents each variant.
   IconData _iconFor(String id) {
     switch (id) {
       case 'standard_chess':
@@ -300,7 +253,6 @@ class _VariantCard extends StatelessWidget {
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
                         Text(
                           variant.name,
