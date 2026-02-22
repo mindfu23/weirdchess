@@ -29,24 +29,37 @@ class GameScreen extends ConsumerWidget {
         ),
         actions: [
           // Pigeon chaos toggle — Standard Chess only.
-          // Uses a stack of two icons (feather + scatter) so no emoji font
-          // is required, which avoids Flutter web Noto font warnings.
           if (variant.id == 'standard_chess')
-            IconButton(
-              icon: Icon(
-                Icons.air, // evokes something sweeping across the board
-                color: chaosEnabled
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withAlpha(80),
-              ),
-              tooltip: chaosEnabled
+            Tooltip(
+              message: chaosEnabled
                   ? 'Pigeon Mode: ON — tap to disable'
                   : 'Pigeon Mode: OFF — tap to enable',
-              onPressed: () =>
-                  ref.read(chaosModeProvider.notifier).toggle(),
+              child: TextButton.icon(
+                onPressed: () =>
+                    ref.read(chaosModeProvider.notifier).toggle(),
+                icon: Icon(
+                  Icons.shuffle,
+                  size: 18,
+                  color: chaosEnabled
+                      ? Theme.of(context).colorScheme.primary
+                      : Theme.of(context)
+                          .colorScheme
+                          .onSurface
+                          .withAlpha(100),
+                ),
+                label: Text(
+                  'Pigeon',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: chaosEnabled
+                        ? Theme.of(context).colorScheme.primary
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withAlpha(100),
+                  ),
+                ),
+              ),
             ),
           // Difficulty selector
           PopupMenuButton<AIDifficulty>(
