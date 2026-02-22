@@ -44,7 +44,7 @@ class GameScreen extends ConsumerWidget {
                         .withAlpha(100),
               ),
               label: Text(
-                'Toggle for a random pigeon attack on the chessboard.',
+                'Random pigeon attack',
                 style: TextStyle(
                   fontSize: 12,
                   color: chaosEnabled

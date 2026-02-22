@@ -91075,7 +91075,7 @@ else{s=A.J(a).ax.k3
 s=A.ae(100,s.v()>>>16&255,s.v()>>>8&255,s.v()&255)}s=A.q0(B.Hf,s,q,18)
 if(n)r=A.J(a).ax.b
 else{r=A.J(a).ax.k3
-r=A.ae(100,r.v()>>>16&255,r.v()>>>8&255,r.v()&255)}i.push(A.aFx(s,A.bD("Toggle for a random pigeon attack on the chessboard.",q,q,q,A.dV(q,q,r,q,q,q,q,q,q,q,q,12,q,q,q,q,q,!0,q,q,q,q,q,q,q,q),q,q),new A.a6n(b)))}i.push(new A.v5(new A.a6o(this,o),new A.a6p(b),"AI Difficulty",B.HO,q,t.RQ))
+r=A.ae(100,r.v()>>>16&255,r.v()>>>8&255,r.v()&255)}i.push(A.aFx(s,A.bD("Random pigeon attack",q,q,q,A.dV(q,q,r,q,q,q,q,q,q,q,q,12,q,q,q,q,q,!0,q,q,q,q,q,q,q,q),q,q),new A.a6n(b)))}i.push(new A.v5(new A.a6o(this,o),new A.a6p(b),"AI Difficulty",B.HO,q,t.RQ))
 i.push(A.uj(q,q,q,B.HP,q,q,new A.a6q(this,a,p),q,q,q,"Rules"))
 l=A.a0J(i,q,k,l)
 j=A.b([this.a7E(a),B.PQ],j)
