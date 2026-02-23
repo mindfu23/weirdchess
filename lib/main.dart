@@ -69,11 +69,21 @@ class _WeirdChessAppState extends ConsumerState<WeirdChessApp> {
     llmNotifier.setProviderWithModel(config.provider, config.currentModel);
     llmNotifier.setEnabled(config.commentaryEnabled);
     llmNotifier.setDirectMode(config.directMode);
-    // On mobile, the Netlify function URL is a relative path with no host —
-    // force direct mode so commentary silently does nothing unless the user
-    // has entered their own API key in Settings.
+    // Send app token with all proxy requests so the Netlify function can reject
+    // unauthorised callers.  Must match the APP_SECRET_TOKEN env var set in the
+    // Netlify dashboard.  Generate your own with: openssl rand -hex 32
+    const appToken = String.fromEnvironment(
+      'APP_SECRET_TOKEN',
+      defaultValue: '',
+    );
+    if (appToken.isNotEmpty) {
+      llmNotifier.setAppToken(appToken);
+    }
+    // On mobile the relative URL has no host — point to the absolute Netlify
+    // URL so commentary works via the server-side proxy.
     if (!kIsWeb) {
-      llmNotifier.setDirectMode(true);
+      llmNotifier.setBaseUrl('https://weirdchess.netlify.app/.netlify/functions');
+      llmNotifier.setDirectMode(false);
     }
   }
 

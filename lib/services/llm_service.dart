@@ -33,6 +33,9 @@ class LlmConfig {
   /// Maximum tokens for response.
   final int maxTokens;
 
+  /// App-level token sent as X-App-Token header to validate proxy requests.
+  final String? appToken;
+
   const LlmConfig({
     this.baseUrl = '/.netlify/functions',
     this.endpoint = '/chess-commentary',
@@ -42,6 +45,7 @@ class LlmConfig {
     this.directMode = true,
     this.maxRetries = 3,
     this.maxTokens = 200,
+    this.appToken,
   });
 
   LlmConfig copyWith({
@@ -53,6 +57,7 @@ class LlmConfig {
     bool? directMode,
     int? maxRetries,
     int? maxTokens,
+    String? appToken,
   }) {
     return LlmConfig(
       baseUrl: baseUrl ?? this.baseUrl,
@@ -63,6 +68,7 @@ class LlmConfig {
       directMode: directMode ?? this.directMode,
       maxRetries: maxRetries ?? this.maxRetries,
       maxTokens: maxTokens ?? this.maxTokens,
+      appToken: appToken ?? this.appToken,
     );
   }
 }
@@ -314,6 +320,9 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
     };
     if (authHeader != null) {
       headers['Authorization'] = authHeader;
+    }
+    if (config.appToken != null) {
+      headers['X-App-Token'] = config.appToken!;
     }
 
     final response = await _client.post(
@@ -587,6 +596,7 @@ class LlmConfigNotifier extends Notifier<LlmConfig> {
   void setDirectMode(bool directMode) => state = state.copyWith(directMode: directMode);
   void setMaxRetries(int maxRetries) => state = state.copyWith(maxRetries: maxRetries);
   void setMaxTokens(int maxTokens) => state = state.copyWith(maxTokens: maxTokens);
+  void setAppToken(String token) => state = state.copyWith(appToken: token);
 
   void setProviderWithModel(LlmProvider provider, String? model) {
     state = state.copyWith(

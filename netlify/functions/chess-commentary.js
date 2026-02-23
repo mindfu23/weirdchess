@@ -23,6 +23,27 @@
  * }
  */
 
+// ---------------------------------------------------------------------------
+// Rate limiting (in-memory, per function instance)
+// Max RATE_LIMIT_MAX requests per RATE_LIMIT_WINDOW_MS from a single IP.
+// ---------------------------------------------------------------------------
+const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const _rateLimitMap = new Map();
+
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const entry = _rateLimitMap.get(ip);
+
+  if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
+    _rateLimitMap.set(ip, { count: 1, windowStart: now });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) return false;
+  entry.count++;
+  return true;
+}
+
 const PROVIDER_CONFIGS = {
   anthropic: {
     url: 'https://api.anthropic.com/v1/messages',
@@ -126,7 +147,7 @@ exports.handler = async (event, context) => {
   // CORS headers
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-App-Token',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json',
   };
@@ -142,6 +163,33 @@ exports.handler = async (event, context) => {
       statusCode: 405,
       headers,
       body: JSON.stringify({ error: 'Method not allowed' }),
+    };
+  }
+
+  // App-token validation — if APP_SECRET_TOKEN env var is set, all requests
+  // must include the matching X-App-Token header.
+  const expectedToken = process.env.APP_SECRET_TOKEN;
+  if (expectedToken) {
+    const sentToken = event.headers['x-app-token'] || event.headers['X-App-Token'];
+    if (sentToken !== expectedToken) {
+      return {
+        statusCode: 403,
+        headers,
+        body: JSON.stringify({ error: 'Forbidden' }),
+      };
+    }
+  }
+
+  // IP-based rate limiting
+  const clientIp =
+    event.headers['x-forwarded-for']?.split(',')[0].trim() ||
+    event.headers['client-ip'] ||
+    'unknown';
+  if (!checkRateLimit(clientIp)) {
+    return {
+      statusCode: 429,
+      headers,
+      body: JSON.stringify({ error: 'Rate limit exceeded — try again later' }),
     };
   }
 

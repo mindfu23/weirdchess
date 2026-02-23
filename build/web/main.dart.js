@@ -29410,7 +29410,7 @@ case"standard_chess":return B.D3
 default:return B.D4}},
 aYJ(){return new A.p1()},
 aWh(){return new A.om()},
-p0:function p0(a,b,c,d,e,f,g,h){var _=this
+p0:function p0(a,b,c,d,e,f,g,h,i){var _=this
 _.a=a
 _.b=b
 _.c=c
@@ -29418,7 +29418,8 @@ _.d=d
 _.e=e
 _.f=f
 _.r=g
-_.w=h},
+_.w=h
+_.x=i},
 q2:function q2(a,b,c){this.a=a
 this.b=b
 this.c=c},
@@ -80956,15 +80957,15 @@ if(B.Gc!==s)return s
 return B.at},
 gqC(){var s=this.a
 return s.a>s.b?B.Uw:B.Uv},
-wQ(a,b,c,d,e){var s=this,r=c==null?s.gcz():c,q=b==null?s.r:b,p=e==null?s.w:e,o=d==null?s.f:d,n=a==null?s.cy:a
+wP(a,b,c,d,e){var s=this,r=c==null?s.gcz():c,q=b==null?s.r:b,p=e==null?s.w:e,o=d==null?s.f:d,n=a==null?s.cy:a
 return new A.DL(s.a,s.b,r,s.e,o,q,p,s.x,!1,s.z,s.Q,s.as,s.at,s.ax,s.ay,s.ch,s.CW,s.cx,n,!1)},
-auo(a,b){return this.wQ(null,a,null,null,b)},
+auo(a,b){return this.wP(null,a,null,null,b)},
 pT(a){var s=null
-return this.wQ(s,a,s,s,s)},
-auq(a,b){return this.wQ(null,null,null,a,b)},
+return this.wP(s,a,s,s,s)},
+auq(a,b){return this.wP(null,null,null,a,b)},
 a_i(a){var s=null
-return this.wQ(s,s,a,s,s)},
-aut(a,b,c,d){return this.wQ(a,b,null,c,d)},
+return this.wP(s,s,a,s,s)},
+aut(a,b,c,d){return this.wP(a,b,null,c,d)},
 a3q(a,b,c,d){var s,r,q,p,o,n,m=this,l=null
 if(!(b||d||c||a))return m
 s=m.r
@@ -99543,17 +99544,18 @@ A.abY.prototype={
 $1(a){return a.b.b!=="K"},
 $S:85}
 A.p0.prototype={
-wP(a,b,c,d,e){var s=this,r=a==null?s.a:a,q=e==null?s.c:e,p=d==null?s.d:d,o=c==null?s.e:c,n=b==null?s.f:b
-return new A.p0(r,s.b,q,p,o,n,s.r,s.w)},
+wQ(a,b,c,d,e,f){var s=this,r=b==null?s.a:b,q=f==null?s.c:f,p=e==null?s.d:e,o=d==null?s.e:d,n=c==null?s.f:c,m=a==null?s.x:a
+return new A.p0(r,s.b,q,p,o,n,s.r,s.w,m)},
 au7(a){var s=null
-return this.wP(s,s,s,s,a)},
+return this.wQ(s,s,s,s,s,a)},
 a_a(a){var s=null
-return this.wP(a,s,s,s,s)},
+return this.wQ(s,a,s,s,s,s)},
 a_b(a){var s=null
-return this.wP(s,s,a,s,s)},
-aun(a,b){return this.wP(null,null,null,a,b)},
+return this.wQ(s,s,s,a,s,s)},
+aun(a,b){var s=null
+return this.wQ(s,s,s,s,a,b)},
 atF(a){var s=null
-return this.wP(s,a,s,s,s)}}
+return this.wQ(s,s,a,s,s,s)}}
 A.q2.prototype={
 gbr(){return this.b}}
 A.dV.prototype={}
@@ -99643,22 +99645,24 @@ case 2:return A.Q(o.at(-1),r)}})
 return A.S($async$oO,r)},
 Ut(a){return B.b.hd(A.b(["429","500","502","503","504","timeout","rate limit"],t.s),new A.aeL(a.toLowerCase()))},
 vr(a,b,c,d){return this.acR(a,b,c,d)},
-acR(a,b,c,d){var s=0,r=A.T(t.kh),q,p=this,o,n,m,l
+acR(a,b,c,d){var s=0,r=A.T(t.kh),q,p=this,o,n,m,l,k
 var $async$vr=A.U(function(e,f){if(e===1)return A.Q(f,r)
-for(;;)switch(s){case 0:m=t.N
-l=A.ag(["Content-Type","application/json"],m,m)
-if(d!=null)l.n(0,"Authorization",d)
+for(;;)switch(s){case 0:l=t.N
+k=A.ag(["Content-Type","application/json"],l,l)
+if(d!=null)k.n(0,"Authorization",d)
 o=p.b
+n=o.x
+if(n!=null)k.n(0,"X-App-Token",n)
 s=3
-return A.O(p.a.pB("POST",A.dJ(o.a+o.b),l,B.aA.tL(A.ag(["provider",o.c.b,"model",o.d,"personality",a,"prompt",b,"variantId",c,"maxTokens",o.w],m,t.K),null),null).EI(B.hU),$async$vr)
-case 3:n=f
-m=n.b
-if(m===200){m=J.dK(B.aA.tA(A.a5d(A.a4Z(n.e)).e6(n.w),null),"commentary")
-q=new A.dV(m==null?"":m,!1)
+return A.O(p.a.pB("POST",A.dJ(o.a+o.b),k,B.aA.tL(A.ag(["provider",o.c.b,"model",o.d,"personality",a,"prompt",b,"variantId",c,"maxTokens",o.w],l,t.K),null),null).EI(B.hU),$async$vr)
+case 3:m=f
+l=m.b
+if(l===200){l=J.dK(B.aA.tA(A.a5d(A.a4Z(m.e)).e6(m.w),null),"commentary")
+q=new A.dV(l==null?"":l,!1)
 s=1
-break}else if(m===429){q=new A.dV("Rate limit exceeded (429)",!0)
+break}else if(l===429){q=new A.dV("Rate limit exceeded (429)",!0)
 s=1
-break}else{q=new A.dV("API error: "+m,!0)
+break}else{q=new A.dV("API error: "+l,!0)
 s=1
 break}case 1:return A.R(q,r)}})
 return A.S($async$vr,r)},
@@ -105818,7 +105822,7 @@ B.h7=new A.yj(0,"miter")
 B.mW=new A.yj(1,"round")
 B.a_6=new A.yj(2,"bevel")
 B.Rd=s([B.h7,B.mW,B.a_6],A.ai("o<yj>"))
-B.Rh=new A.p0("/.netlify/functions","/chess-commentary",B.bU,"claude-3-haiku-20240307",!0,!0,3,200)
+B.Rh=new A.p0("/.netlify/functions","/chess-commentary",B.bU,"claude-3-haiku-20240307",!0,!0,3,200,null)
 B.o=new A.Dz(0,"ignored")
 B.b5=new A.h(4294967304)
 B.fw=new A.h(4294967323)
