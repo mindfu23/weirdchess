@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -83,6 +84,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
     final llmConfig = ref.watch(llmConfigProvider);
+    // Commentary is available with a client API key (direct mode)
+    // or when using the server-side proxy (directMode: false).
+    final canUseCommentary = auth.isAuthenticated || !llmConfig.directMode;
 
     return Scaffold(
       appBar: AppBar(
@@ -108,18 +112,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     SwitchListTile(
                       title: const Text('Enable AI Commentary'),
                       subtitle: Text(
-                        auth.isAuthenticated
+                        canUseCommentary
                             ? 'AI will comment on moves during gameplay'
                             : 'Requires API key to be configured',
                       ),
-                      value: llmConfig.enabled && auth.isAuthenticated,
-                      onChanged: auth.isAuthenticated
+                      value: llmConfig.enabled && canUseCommentary,
+                      onChanged: canUseCommentary
                           ? (value) {
                               ref.read(llmConfigProvider.notifier).setEnabled(value);
+                              ref.read(configServiceProvider).saveCommentaryEnabled(value);
                             }
                           : null,
                     ),
-                    if (!auth.isAuthenticated)
+                    if (!canUseCommentary)
                       Padding(
                         padding: const EdgeInsets.only(left: 16, top: 8),
                         child: Row(
@@ -145,138 +150,141 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Provider Selection Section
-            _buildSectionHeader('LLM Provider'),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Select your preferred AI provider:',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    const SizedBox(height: 12),
-                    ...LlmProvider.values.map((provider) => RadioListTile<LlmProvider>(
-                          title: Text(provider.displayName),
-                          subtitle: Text('Model: ${provider.defaultModel}'),
-                          value: provider,
-                          groupValue: _selectedProvider,
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                _selectedProvider = value;
-                              });
-                            }
-                          },
-                        )),
-                  ],
+            // Developer-only sections: hidden in release builds
+            if (kDebugMode) ...[
+              // Provider Selection Section
+              _buildSectionHeader('LLM Provider'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Select your preferred AI provider:',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                      const SizedBox(height: 12),
+                      ...LlmProvider.values.map((provider) => RadioListTile<LlmProvider>(
+                            title: Text(provider.displayName),
+                            subtitle: Text('Model: ${provider.defaultModel}'),
+                            value: provider,
+                            groupValue: _selectedProvider,
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  _selectedProvider = value;
+                                });
+                              }
+                            },
+                          )),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // API Keys Section
-            _buildSectionHeader('API Keys'),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Configure API keys for each provider:',
-                          style: TextStyle(fontSize: 14),
-                        ),
-                        TextButton.icon(
-                          onPressed: () {
-                            setState(() {
-                              _obscureApiKeys = !_obscureApiKeys;
-                            });
-                          },
-                          icon: Icon(
-                            _obscureApiKeys
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            size: 18,
+              // API Keys Section
+              _buildSectionHeader('API Keys'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Configure API keys for each provider:',
+                            style: TextStyle(fontSize: 14),
                           ),
-                          label: Text(_obscureApiKeys ? 'Show' : 'Hide'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    ...LlmProvider.values.map((provider) => Padding(
-                          padding: const EdgeInsets.only(bottom: 16),
-                          child: TextField(
-                            controller: _apiKeyControllers[provider],
-                            obscureText: _obscureApiKeys,
-                            decoration: InputDecoration(
-                              labelText: provider.displayName,
-                              hintText: 'Enter ${provider.name} API key',
-                              prefixIcon: Icon(
-                                _selectedProvider == provider
-                                    ? Icons.check_circle
-                                    : Icons.key,
-                                color: _selectedProvider == provider
-                                    ? Colors.green
+                          TextButton.icon(
+                            onPressed: () {
+                              setState(() {
+                                _obscureApiKeys = !_obscureApiKeys;
+                              });
+                            },
+                            icon: Icon(
+                              _obscureApiKeys
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
+                              size: 18,
+                            ),
+                            label: Text(_obscureApiKeys ? 'Show' : 'Hide'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      ...LlmProvider.values.map((provider) => Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: TextField(
+                              controller: _apiKeyControllers[provider],
+                              obscureText: _obscureApiKeys,
+                              decoration: InputDecoration(
+                                labelText: provider.displayName,
+                                hintText: 'Enter ${provider.name} API key',
+                                prefixIcon: Icon(
+                                  _selectedProvider == provider
+                                      ? Icons.check_circle
+                                      : Icons.key,
+                                  color: _selectedProvider == provider
+                                      ? Colors.green
+                                      : null,
+                                ),
+                                border: const OutlineInputBorder(),
+                                suffixIcon: _selectedProvider == provider
+                                    ? const Chip(
+                                        label: Text('Active'),
+                                        backgroundColor: Colors.green,
+                                        labelStyle: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                        ),
+                                      )
                                     : null,
                               ),
-                              border: const OutlineInputBorder(),
-                              suffixIcon: _selectedProvider == provider
-                                  ? const Chip(
-                                      label: Text('Active'),
-                                      backgroundColor: Colors.green,
-                                      labelStyle: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 10,
-                                      ),
-                                    )
-                                  : null,
                             ),
-                          ),
-                        )),
-                  ],
+                          )),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Advanced Settings
-            _buildSectionHeader('Advanced'),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _baseUrlController,
-                      decoration: const InputDecoration(
-                        labelText: 'API Base URL',
-                        hintText: '/.netlify/functions',
-                        prefixIcon: Icon(Icons.link),
-                        border: OutlineInputBorder(),
-                        helperText: 'Leave default for Netlify deployment',
+              // Advanced Settings
+              _buildSectionHeader('Advanced'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: _baseUrlController,
+                        decoration: const InputDecoration(
+                          labelText: 'API Base URL',
+                          hintText: '/.netlify/functions',
+                          prefixIcon: Icon(Icons.link),
+                          border: OutlineInputBorder(),
+                          helperText: 'Leave default for Netlify deployment',
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _saveSettings,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Save Settings'),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _saveSettings,
+                          icon: const Icon(Icons.save),
+                          label: const Text('Save Settings'),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
+            ],
 
             // Info Section
             _buildSectionHeader('About AI Commentary'),
@@ -313,41 +321,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 24),
-
-            // Future Auth Section (placeholder)
-            _buildSectionHeader('Authentication'),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    ListTile(
-                      leading: const Icon(Icons.account_circle),
-                      title: const Text('Sign In / Sign Up'),
-                      subtitle: const Text('Coming soon - connect your account'),
-                      trailing: const Icon(Icons.chevron_right),
-                      enabled: false,
-                      onTap: () {
-                        // Placeholder for future auth flow
-                      },
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        'Account integration will allow syncing settings '
-                        'and game history across devices.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
+            // Future Auth Section (placeholder) — developer only
+            if (kDebugMode) ...[
+              const SizedBox(height: 24),
+              _buildSectionHeader('Authentication'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ListTile(
+                        leading: const Icon(Icons.account_circle),
+                        title: const Text('Sign In / Sign Up'),
+                        subtitle: const Text('Coming soon - connect your account'),
+                        trailing: const Icon(Icons.chevron_right),
+                        enabled: false,
+                        onTap: () {
+                          // Placeholder for future auth flow
+                        },
+                      ),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Account integration will allow syncing settings '
+                          'and game history across devices.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

@@ -188,8 +188,11 @@ class CommentaryBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final commentary = ref.watch(commentaryProvider);
     final auth = ref.watch(authProvider);
+    final llmConfig = ref.watch(llmConfigProvider);
 
-    if (!auth.isAuthenticated ||
+    final canShowCommentary = auth.isAuthenticated || !llmConfig.directMode;
+
+    if (!canShowCommentary ||
         (commentary.text.isEmpty && !commentary.isLoading)) {
       return const SizedBox.shrink();
     }

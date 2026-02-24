@@ -17,11 +17,11 @@ class ThreeCheckChess extends ChessVariant {
   String get id => 'three_check';
 
   @override
-  String get name => 'Three-Check';
+  String get name => '3-Check';
 
   @override
   String get description =>
-      'Give check 3 times to win. Standard rules otherwise.';
+      'Check the opponent 3 times to win. Standard rules otherwise.';
 
   @override
   int get boardSize => 8;
@@ -40,7 +40,7 @@ class ThreeCheckChess extends ChessVariant {
 
   @override
   String get rulesSummary => '''
-Three-Check follows all standard chess rules with one addition:
+3-Check follows all standard chess rules with one addition:
 
 Win conditions:
 - Checkmate (standard)
