@@ -284,45 +284,42 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
               ),
               const SizedBox(height: 24),
-            ],
 
-            // Info Section
-            _buildSectionHeader('About AI Commentary'),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoRow(
-                      Icons.smart_toy,
-                      'Personality',
-                      'Each variant has a unique AI personality that comments on moves',
-                    ),
-                    const Divider(),
-                    _buildInfoRow(
-                      Icons.psychology,
-                      'Barsoomian Warrior',
-                      'Jetan features dramatic Martian warrior commentary',
-                    ),
-                    const Divider(),
-                    _buildInfoRow(
-                      Icons.account_balance,
-                      'Court Chronicler',
-                      'Hyderabad Chess has an 18th-century Indian chronicler',
-                    ),
-                    const Divider(),
-                    _buildInfoRow(
-                      Icons.school,
-                      'Grand Master',
-                      'Grand Chess features refined strategic commentary',
-                    ),
-                  ],
+              // Info Section
+              _buildSectionHeader('About AI Commentary'),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInfoRow(
+                        Icons.smart_toy,
+                        'Personality',
+                        'Each variant has a unique AI personality that comments on moves',
+                      ),
+                      const Divider(),
+                      _buildInfoRow(
+                        Icons.psychology,
+                        'Barsoomian Warrior',
+                        'Jetan features dramatic Martian warrior commentary',
+                      ),
+                      const Divider(),
+                      _buildInfoRow(
+                        Icons.account_balance,
+                        'Court Chronicler',
+                        'Hyderabad Chess has an 18th-century Indian chronicler',
+                      ),
+                      const Divider(),
+                      _buildInfoRow(
+                        Icons.school,
+                        'Grand Master',
+                        'Grand Chess features refined strategic commentary',
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            // Future Auth Section (placeholder) — developer only
-            if (kDebugMode) ...[
               const SizedBox(height: 24),
               _buildSectionHeader('Authentication'),
               Card(
