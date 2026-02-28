@@ -427,6 +427,7 @@ class GameNotifier extends Notifier<GameState> {
       final chaosEnabled = ref.read(chaosModeProvider);
       if (chaosEnabled &&
           variant.id == 'standard_chess' &&
+          state.moveHistory.length >= 5 &&
           state.moveHistory.length % 5 == 0) {
         pigeonFired = _triggerPigeonChaos();
       }

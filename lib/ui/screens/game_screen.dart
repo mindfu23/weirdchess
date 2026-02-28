@@ -127,8 +127,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           // Pigeon chaos toggle — Standard Chess only.
           if (variant.id == 'standard_chess')
             TextButton.icon(
-              onPressed: () =>
-                  ref.read(chaosModeProvider.notifier).toggle(),
+              onPressed: () {
+                ref.read(chaosModeProvider.notifier).toggle();
+                // Clear stale pigeon event when toggling off so the overlay
+                // doesn't re-appear when the user toggles back on.
+                if (!ref.read(chaosModeProvider)) {
+                  ref.read(pigeonEventProvider.notifier).clear();
+                }
+              },
               icon: Icon(
                 Icons.air,
                 size: 18,
@@ -140,7 +146,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                         .withAlpha(100),
               ),
               label: Text(
-                chaosEnabled ? 'Random pigeon attack' : 'Random pigeon attack off',
+                chaosEnabled ? 'Random pigeon attack on' : 'Random pigeon attack off',
                 style: TextStyle(
                   fontSize: 12,
                   color: chaosEnabled
