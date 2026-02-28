@@ -544,7 +544,7 @@ class GameNotifier extends Notifier<GameState> {
     final ai = ref.read(aiOpponentProvider);
     ai.difficulty = ref.read(aiDifficultyProvider);
 
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future.delayed(const Duration(milliseconds: 500));
 
     final move = await ai.findBestMove(state);
     if (move != null) {
