@@ -623,6 +623,21 @@ class GameNotifier extends Notifier<GameState> {
 
     final generation = _commentaryGeneration;
 
+    // Decide whether to include pigeon flavor in the system prompt:
+    //  • Move 1: yes (set the tone)
+    //  • Moves 2–4: no
+    //  • Move 5 (pigeon fires): yes
+    //  • After that: yes when pigeon fires (every 5th), plus ~1-in-5 random
+    bool pigeonContext = false;
+    if (ref.read(chaosModeProvider) && variantId == 'standard_chess') {
+      if (_pigeonMoveCounter == 1) {
+        pigeonContext = true;
+      } else if (_pigeonMoveCounter >= 5 && _pigeonMoveCounter % 5 == 0) {
+        pigeonContext = true;
+      } else if (_pigeonMoveCounter > 5 && Random().nextInt(5) == 0) {
+        pigeonContext = true;
+      }
+    }
 
     final response = await llmService.generateCommentary(
       variantId: variantId,
@@ -632,7 +647,7 @@ class GameNotifier extends Notifier<GameState> {
       capturedPiece: capturedPiece,
       isCheck: state.board.isInCheck(PieceColor.white),
       isCheckmate: state.result == GameResult.blackWins,
-      pigeonChaosEnabled: ref.read(chaosModeProvider),
+      pigeonChaosEnabled: pigeonContext,
       authHeader: auth.authHeader,
     );
 
