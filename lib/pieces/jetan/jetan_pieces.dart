@@ -16,20 +16,47 @@ class Chief extends Piece {
   Piece copy() => Chief(color: color, hasMoved: hasMoved);
 }
 
-/// Princess: Moves up to 3 squares in any direction
-/// Note: In traditional Jetan, cannot move until another piece occupies her square
-/// This simplified version allows normal movement
+/// Princess: Moves up to 3 squares in any direction.
+/// Once per game, may use "The Escape" — jump to any unoccupied,
+/// unthreatened square on the board.
 class Princess extends Piece {
-  Princess({required super.color, super.hasMoved})
-      : super(symbol: 'Pr', name: 'Princess', value: 9);
+  final bool escapeAvailable;
+
+  Princess({
+    required super.color,
+    super.hasMoved,
+    this.escapeAvailable = true,
+  }) : super(symbol: 'Pr', name: 'Princess', value: 9);
 
   @override
   List<Move> getPseudoLegalMoves(Board board, Position position) {
-    return getSlidingMoves(board, position, Direction.all, maxDistance: 3);
+    final moves =
+        getSlidingMoves(board, position, Direction.all, maxDistance: 3);
+
+    // Generate Escape moves to every empty square on the board.
+    // The "unthreatened" filter is applied in Jetan.getLegalMoves().
+    if (escapeAvailable) {
+      final normalTargets = moves.map((m) => m.to).toSet();
+      for (int row = 0; row < board.size; row++) {
+        for (int col = 0; col < board.size; col++) {
+          final target = Position(row, col);
+          if (target == position) continue;
+          if (board.getPiece(target) != null) continue;
+          if (normalTargets.contains(target)) continue;
+          moves.add(Move(from: position, to: target, isEscape: true));
+        }
+      }
+    }
+
+    return moves;
   }
 
   @override
-  Piece copy() => Princess(color: color, hasMoved: hasMoved);
+  Piece copy() => Princess(
+        color: color,
+        hasMoved: hasMoved,
+        escapeAvailable: escapeAvailable,
+      );
 }
 
 /// Flier: Moves up to 3 squares diagonally

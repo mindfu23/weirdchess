@@ -93,11 +93,81 @@ class ScorePanel extends ConsumerWidget {
               ),
             ],
           ),
+          const SizedBox(height: 8),
+
+          // Play-as color toggle
+          _buildColorToggle(ref, notifier, variant),
+
+          // Jetan-specific rules
+          if (variant.id == 'jetan') ...[
+            const SizedBox(height: 8),
+            _buildJetanRulesInfo(gameState),
+          ],
 
           // Selected piece info — shown inline below controls
           const PieceInfoPanel(),
         ],
       ),
+    );
+  }
+
+  Widget _buildJetanRulesInfo(GameState gameState) {
+    final whiteUsed =
+        gameState.variantData['princessEscapeUsed_white'] == true;
+    final blackUsed =
+        gameState.variantData['princessEscapeUsed_black'] == true;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'JETAN RULES',
+          style: TextStyle(
+            fontFamily: 'Righteous',
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: _kAccent,
+            letterSpacing: 0.8,
+          ),
+        ),
+        const SizedBox(height: 6),
+        const Text(
+          '\u2022 Panthans do not promote',
+          style: TextStyle(fontSize: 11, color: _kTextMuted),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '\u2022 Princess Escape: Once per game, jump to any unoccupied, unthreatened square',
+          style: TextStyle(fontSize: 11, color: _kTextMuted),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            const SizedBox(width: 10),
+            Text(
+              'White: ${whiteUsed ? "Used" : "Available"}',
+              style: TextStyle(
+                fontSize: 10,
+                color: whiteUsed ? _kTextMuted : _kAccent,
+                fontWeight:
+                    whiteUsed ? FontWeight.normal : FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Black: ${blackUsed ? "Used" : "Available"}',
+              style: TextStyle(
+                fontSize: 10,
+                color: blackUsed ? _kTextMuted : _kAccent,
+                fontWeight:
+                    blackUsed ? FontWeight.normal : FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Divider(height: 1, color: Color(0xFF4A5568)),
+      ],
     );
   }
 
@@ -339,6 +409,54 @@ class ScorePanel extends ConsumerWidget {
         const SizedBox(height: 4),
         _buildCapturedRow('Black captured:', gameState.whiteCaptured),
       ],
+    );
+  }
+
+  Widget _buildColorToggle(WidgetRef ref, dynamic notifier, ChessVariant variant) {
+    final humanColor = ref.watch(humanColorProvider);
+    final isWhite = humanColor == PieceColor.white;
+
+    return GestureDetector(
+      onTap: () {
+        final newColor =
+            isWhite ? PieceColor.black : PieceColor.white;
+        ref.read(humanColorProvider.notifier).set(newColor);
+        if (variant.id == 'horde') {
+          ref
+              .read(pendingHordeSideSelectionProvider.notifier)
+              .set(true);
+        } else {
+          notifier.newGame(variant);
+        }
+      },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Text(
+            'Play as:',
+            style: TextStyle(fontSize: 13, color: _kTextMuted),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 18,
+            height: 18,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isWhite ? Colors.white : _kBackground,
+              border: Border.all(color: _kTextMuted, width: 1.5),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            isWhite ? 'White' : 'Black',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: _kTextPrimary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

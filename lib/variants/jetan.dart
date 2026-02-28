@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/board.dart';
+import '../core/game_state.dart';
 import '../core/move.dart';
 import '../core/piece.dart';
 import '../pieces/jetan/jetan_pieces.dart';
@@ -175,4 +176,86 @@ Win by capturing the opponent's Chief or reaching their back rank with your Prin
           movementDescription: 'Moves 1 square in any direction (like a King).',
         ),
       };
+
+  // ── Jetan-specific overrides ───────────────────────────────────────────────
+
+  @override
+  GameState createNewGame() {
+    return GameState(
+      board: createInitialBoard(),
+      variantName: id,
+      variant: this,
+      variantData: {
+        'princessEscapeUsed_white': false,
+        'princessEscapeUsed_black': false,
+      },
+    );
+  }
+
+  @override
+  List<Move> getLegalMoves(Board board, Position pos, Piece piece) {
+    final moves = piece.getLegalMoves(board, pos);
+
+    // For Princess, filter escape moves: target must not be attacked.
+    if (piece is Princess && piece.escapeAvailable) {
+      return moves.where((m) {
+        if (!m.isEscape) return true;
+        return !board.isSquareAttacked(m.to, piece.color.opposite);
+      }).toList();
+    }
+
+    return moves;
+  }
+
+  @override
+  void updateVariantData(
+    Board board,
+    Move move,
+    PieceColor justMoved,
+    Map<String, dynamic> data,
+  ) {
+    if (move.isEscape) {
+      final colorKey =
+          justMoved == PieceColor.white ? 'white' : 'black';
+      data['princessEscapeUsed_$colorKey'] = true;
+
+      // Update the Princess on the board so future moves know escape is used.
+      final piece = board.getPiece(move.to);
+      if (piece is Princess) {
+        board.setPiece(
+          move.to,
+          Princess(
+            color: piece.color,
+            hasMoved: true,
+            escapeAvailable: false,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Jetan doesn't use standard kings — skip check/stalemate detection.
+  @override
+  bool requiresKing(PieceColor color) => false;
+
+  @override
+  void postRestoreBoard(Board board, Map<String, dynamic> variantData) {
+    for (final color in PieceColor.values) {
+      final key = 'princessEscapeUsed_${color == PieceColor.white ? "white" : "black"}';
+      if (variantData[key] == true) {
+        for (final (pos, piece) in board.getPieces(color)) {
+          if (piece is Princess && piece.escapeAvailable) {
+            board.setPiece(
+              pos,
+              Princess(
+                color: color,
+                hasMoved: piece.hasMoved,
+                escapeAvailable: false,
+              ),
+            );
+          }
+        }
+      }
+    }
+  }
 }

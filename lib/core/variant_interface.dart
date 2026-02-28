@@ -51,4 +51,9 @@ abstract class ChessVariantInterface {
 
   /// Create a piece by symbol for promotion or board setup.
   Piece createPiece(String symbol, PieceColor color);
+
+  /// Post-process the board after restoration from saved state.
+  /// Override to synchronize piece state with variantData (e.g., Princess
+  /// escape availability in Jetan).
+  void postRestoreBoard(Board board, Map<String, dynamic> variantData);
 }

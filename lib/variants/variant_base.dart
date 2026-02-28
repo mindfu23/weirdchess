@@ -95,6 +95,10 @@ abstract class ChessVariant implements ChessVariantInterface {
   /// Full board visibility by default (no fog of war).
   @override
   Set<Position>? getVisibleSquares(Board board, PieceColor color) => null;
+
+  /// No post-restore processing by default.
+  @override
+  void postRestoreBoard(Board board, Map<String, dynamic> variantData) {}
 }
 
 /// Information about a piece type for the info panel.

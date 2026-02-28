@@ -156,7 +156,7 @@ final atomicExplosionEventProvider =
 // ── Human colour / Horde side selection ──────────────────────────────────────
 
 /// Which colour the human player controls. Defaults to white.
-/// Only Horde Chess supports changing this; all other variants use white.
+/// All variants support changing this via the score panel toggle.
 class HumanColorNotifier extends Notifier<PieceColor> {
   @override
   PieceColor build() => PieceColor.white;
@@ -223,6 +223,34 @@ class PigeonEventNotifier extends Notifier<PigeonEvent?> {
 final pigeonEventProvider =
     NotifierProvider<PigeonEventNotifier, PigeonEvent?>(
         PigeonEventNotifier.new);
+
+// ── Pawn promotion ──────────────────────────────────────────────────────────
+
+/// Tracks a pending pawn promotion awaiting user input.
+class PendingPromotion {
+  final Position from;
+  final Position to;
+  final bool isCapture;
+  final List<String> promotionOptions;
+
+  const PendingPromotion({
+    required this.from,
+    required this.to,
+    required this.isCapture,
+    required this.promotionOptions,
+  });
+}
+
+class PendingPromotionNotifier extends Notifier<PendingPromotion?> {
+  @override
+  PendingPromotion? build() => null;
+
+  void set(PendingPromotion? value) => state = value;
+}
+
+final pendingPromotionProvider =
+    NotifierProvider<PendingPromotionNotifier, PendingPromotion?>(
+        PendingPromotionNotifier.new);
 
 // ── Game persistence ────────────────────────────────────────────────────────
 
@@ -379,13 +407,27 @@ class GameNotifier extends Notifier<GameState> {
     final variant = ref.read(selectedVariantProvider);
 
     if (_selectedPosition != null) {
-      final move = _selectedPieceMoves.firstWhere(
-        (m) => m.to == position,
-        orElse: () => Move(from: _selectedPosition!, to: position),
-      );
+      final movesToTarget =
+          _selectedPieceMoves.where((m) => m.to == position).toList();
 
-      if (_selectedPieceMoves.any((m) => m.to == position)) {
-        await _makeMove(move);
+      if (movesToTarget.isNotEmpty) {
+        // Check if these are promotion moves (multiple moves to same square
+        // with different promotionPiece values).
+        final isPromotion = movesToTarget.length > 1 &&
+            movesToTarget.every((m) => m.promotionPiece != null);
+
+        if (isPromotion) {
+          ref.read(pendingPromotionProvider.notifier).set(PendingPromotion(
+                from: _selectedPosition!,
+                to: position,
+                isCapture: movesToTarget.first.isCapture,
+                promotionOptions:
+                    movesToTarget.map((m) => m.promotionPiece!).toList(),
+              ));
+          return;
+        }
+
+        await _makeMove(movesToTarget.first);
         return;
       }
 
@@ -416,6 +458,31 @@ class GameNotifier extends Notifier<GameState> {
       _selectedPieceMoves = [];
       state = state.copy();
     }
+  }
+
+  /// Called by the UI after the user selects a promotion piece from the dialog.
+  Future<void> completePromotion(String promotionPiece) async {
+    final pending = ref.read(pendingPromotionProvider);
+    if (pending == null) return;
+
+    ref.read(pendingPromotionProvider.notifier).set(null);
+
+    final move = Move(
+      from: pending.from,
+      to: pending.to,
+      isCapture: pending.isCapture,
+      promotionPiece: promotionPiece,
+    );
+
+    await _makeMove(move);
+  }
+
+  /// Called if the user cancels a pending promotion.
+  void cancelPromotion() {
+    ref.read(pendingPromotionProvider.notifier).set(null);
+    _selectedPosition = null;
+    _selectedPieceMoves = [];
+    state = state.copy();
   }
 
   Future<void> _makeMove(Move move) async {
@@ -511,14 +578,29 @@ class GameNotifier extends Notifier<GameState> {
           !testBoard.isInCheck(PieceColor.black)) {
         final newState = state.copy();
         newState.board.removePiece(fromPos);
-        newState.board.setPiece(toPos, piece);
+
+        // Auto-promote pawns that land on their promotion rank.
+        final variant = ref.read(selectedVariantProvider);
+        var placedPiece = piece;
+        bool wasPromoted = false;
+        if (piece.symbol == 'P') {
+          final backRank = piece.color == PieceColor.white ? 0 : board.size - 1;
+          if (toPos.row == backRank) {
+            placedPiece = variant.createPiece('Q', piece.color);
+            placedPiece.hasMoved = true;
+            wasPromoted = true;
+          }
+        }
+        newState.board.setPiece(toPos, placedPiece);
         state = newState;
 
         final event = PigeonEvent(
           from: fromPos,
           to: toPos,
           pieceColor: piece.color,
-          pieceName: piece.name,
+          pieceName: wasPromoted
+              ? '${piece.name} (promoted to Queen)'
+              : piece.name,
           fromSquare: fromPos.toAlgebraic(board.size),
           toSquare: toPos.toAlgebraic(board.size),
           affectedAIPiece: piece.color == PieceColor.black,

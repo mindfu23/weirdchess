@@ -81,6 +81,79 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
+  void _showPromotionDialog(PendingPromotion pending) {
+    final variant = ref.read(selectedVariantProvider);
+
+    showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2D3542),
+        title: const Text(
+          'Promote Pawn',
+          style: TextStyle(
+            fontFamily: 'Righteous',
+            color: Color(0xFFF5E6D3),
+          ),
+        ),
+        content: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.center,
+          children: pending.promotionOptions.map((symbol) {
+            final info = variant.pieceInfo[symbol];
+            final displayName = info?.name ?? symbol;
+            final displaySymbol = info?.symbol ?? symbol;
+
+            return InkWell(
+              onTap: () => Navigator.pop(ctx, symbol),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 64,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A1A),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: const Color(0xFF9B8E85).withAlpha(80),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      displaySymbol,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFF5E6D3),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Color(0xFF9B8E85),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    ).then((selected) {
+      if (selected != null) {
+        ref.read(gameNotifierProvider.notifier).completePromotion(selected);
+      } else {
+        ref.read(gameNotifierProvider.notifier).cancelPromotion();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Listen for the pending-dialog flag set by home screen or score panel.
@@ -89,6 +162,15 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ref.read(pendingHordeSideSelectionProvider.notifier).set(false);
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _showHordeSideDialog();
+        });
+      }
+    });
+
+    // Listen for pending pawn promotion.
+    ref.listen<PendingPromotion?>(pendingPromotionProvider, (prev, next) {
+      if (next != null && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _showPromotionDialog(next);
         });
       }
     });

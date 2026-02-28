@@ -606,6 +606,10 @@ class GameState {
       orElse: () => GameResult.ongoing,
     );
 
+    // Let the variant synchronize piece state with restored variantData
+    // (e.g., Jetan Princess escape availability).
+    variant.postRestoreBoard(board, variantData);
+
     return GameState(
       board: board,
       variantName: variantName,

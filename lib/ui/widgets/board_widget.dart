@@ -17,9 +17,8 @@ class BoardWidget extends ConsumerWidget {
     final boardSize = variant.boardSize;
     final humanColor = ref.watch(humanColorProvider);
 
-    // Flip the board when human plays Black in Horde Chess.
-    final isFlipped =
-        variant.id == 'horde' && humanColor == PieceColor.black;
+    // Flip the board when human plays Black.
+    final isFlipped = humanColor == PieceColor.black;
 
     return AspectRatio(
       aspectRatio: 1.0,

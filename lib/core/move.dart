@@ -50,6 +50,7 @@ class Move {
   final bool isCapture;
   final bool isCastling;
   final bool isEnPassant;
+  final bool isEscape;
 
   const Move({
     required this.from,
@@ -58,6 +59,7 @@ class Move {
     this.isCapture = false,
     this.isCastling = false,
     this.isEnPassant = false,
+    this.isEscape = false,
   });
 
   Move copyWith({
@@ -67,6 +69,7 @@ class Move {
     bool? isCapture,
     bool? isCastling,
     bool? isEnPassant,
+    bool? isEscape,
   }) {
     return Move(
       from: from ?? this.from,
@@ -75,6 +78,7 @@ class Move {
       isCapture: isCapture ?? this.isCapture,
       isCastling: isCastling ?? this.isCastling,
       isEnPassant: isEnPassant ?? this.isEnPassant,
+      isEscape: isEscape ?? this.isEscape,
     );
   }
 
