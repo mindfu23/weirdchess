@@ -251,9 +251,12 @@ class LlmService {
 
 Generate a brief (1-2 sentence) commentary on this move in character.''';
 
-    // Retry with exponential backoff
+    // Retry with exponential backoff.
+    // For 429 (rate limit) errors, use longer delays and fail silently
+    // so the game isn't interrupted by an error banner.
     int attempt = 0;
     Duration delay = const Duration(milliseconds: 500);
+    bool wasRateLimited = false;
 
     while (attempt < config.maxRetries) {
       try {
@@ -265,15 +268,29 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
           return response;
         }
 
+        // Track rate-limit errors separately for silent handling.
+        if (_isRateLimitError(response.text)) {
+          wasRateLimited = true;
+        }
+
         // Check if error is retryable
         if (_isRetryableError(response.text)) {
           attempt++;
           if (attempt < config.maxRetries) {
-            debugPrint('LLM API call failed (attempt $attempt/${config.maxRetries}), retrying in ${delay.inMilliseconds}ms');
-            await Future.delayed(delay);
+            final rateLimitDelay = wasRateLimited
+                ? Duration(seconds: 2 * attempt) // Longer backoff for 429
+                : delay;
+            debugPrint('LLM API call failed (attempt $attempt/${config.maxRetries}), retrying in ${rateLimitDelay.inMilliseconds}ms');
+            await Future.delayed(rateLimitDelay);
             delay *= 2; // Exponential backoff
             continue;
           }
+        }
+
+        // Rate-limit errors fail silently — just skip commentary this turn.
+        if (wasRateLimited) {
+          debugPrint('Rate-limited after $attempt retries — skipping commentary silently.');
+          return const CommentaryResponse(text: '');
         }
 
         return CommentaryResponse.error(response.text, retryCount: attempt);
@@ -298,6 +315,12 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
       }
     }
 
+    // If all retries exhausted due to rate limiting, fail silently.
+    if (wasRateLimited) {
+      debugPrint('Rate-limited after all retries — skipping commentary silently.');
+      return const CommentaryResponse(text: '');
+    }
+
     return CommentaryResponse.error(
       'Commentary temporarily unavailable. Check your connection.',
       retryCount: attempt,
@@ -309,6 +332,12 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
     final retryableCodes = ['429', '500', '502', '503', '504', 'timeout', 'rate limit'];
     final lowerError = errorText.toLowerCase();
     return retryableCodes.any((code) => lowerError.contains(code));
+  }
+
+  /// Check if an error is specifically a rate-limit (429) error.
+  bool _isRateLimitError(String errorText) {
+    final lower = errorText.toLowerCase();
+    return lower.contains('429') || lower.contains('rate limit');
   }
 
   /// Check if an exception is retryable.
@@ -546,6 +575,7 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
     // Reuse the same retry loop as generateCommentary
     int attempt = 0;
     Duration delay = const Duration(milliseconds: 500);
+    bool wasRateLimited = false;
 
     while (attempt < config.maxRetries) {
       try {
@@ -557,13 +587,25 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
 
         if (!response.isError) return response;
 
+        if (_isRateLimitError(response.text)) {
+          wasRateLimited = true;
+        }
+
         if (_isRetryableError(response.text)) {
           attempt++;
           if (attempt < config.maxRetries) {
-            await Future.delayed(delay);
+            final rateLimitDelay = wasRateLimited
+                ? Duration(seconds: 2 * attempt)
+                : delay;
+            await Future.delayed(rateLimitDelay);
             delay *= 2;
             continue;
           }
+        }
+
+        if (wasRateLimited) {
+          debugPrint('Rate-limited after $attempt retries — skipping pigeon commentary silently.');
+          return const CommentaryResponse(text: '');
         }
 
         return CommentaryResponse.error(response.text, retryCount: attempt);
@@ -585,6 +627,11 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
           retryCount: attempt,
         );
       }
+    }
+
+    if (wasRateLimited) {
+      debugPrint('Rate-limited after all retries — skipping pigeon commentary silently.');
+      return const CommentaryResponse(text: '');
     }
 
     return CommentaryResponse.error(

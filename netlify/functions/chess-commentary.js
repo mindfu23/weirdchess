@@ -27,7 +27,7 @@
 // Rate limiting (in-memory, per function instance)
 // Max RATE_LIMIT_MAX requests per RATE_LIMIT_WINDOW_MS from a single IP.
 // ---------------------------------------------------------------------------
-const RATE_LIMIT_MAX = 30;
+const RATE_LIMIT_MAX = 100;
 const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
 const _rateLimitMap = new Map();
 
