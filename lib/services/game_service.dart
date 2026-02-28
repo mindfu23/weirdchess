@@ -179,6 +179,17 @@ final pendingHordeSideSelectionProvider =
     NotifierProvider<PendingHordeSideSelectionNotifier, bool>(
         PendingHordeSideSelectionNotifier.new);
 
+/// Whether the current game was restored from persistence (skip Horde dialog).
+class GameRestoredNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+}
+
+final gameRestoredProvider =
+    NotifierProvider<GameRestoredNotifier, bool>(GameRestoredNotifier.new);
+
 /// Describes a pigeon chaos teleport event for UI and commentary.
 class PigeonEvent {
   final Position from;
@@ -219,12 +230,13 @@ final pigeonEventProvider =
 class GamePersistenceService {
   static const _prefix = 'weirdchess_saved_game_';
 
-  /// Save the current game + last commentary text for a variant.
+  /// Save the current game + last commentary text + human colour for a variant.
   Future<void> saveGame(
     String variantId,
     GameState gameState,
-    String? lastCommentary,
-  ) async {
+    String? lastCommentary, {
+    PieceColor? humanColor,
+  }) async {
     if (gameState.isGameOver) {
       await clearGame(variantId);
       return;
@@ -233,6 +245,8 @@ class GamePersistenceService {
     final data = jsonEncode({
       'gameState': gameState.toJson(),
       'lastCommentary': lastCommentary,
+      if (humanColor != null)
+        'humanColor': humanColor == PieceColor.white ? 'white' : 'black',
     });
     await prefs.setString('$_prefix$variantId', data);
   }
@@ -662,6 +676,14 @@ class GameNotifier extends Notifier<GameState> {
       _selectedPieceMoves = [];
       _isAIThinking = false;
 
+      // Restore the human colour that was active when the game was saved.
+      final savedColor = savedData['humanColor'] as String?;
+      if (savedColor != null) {
+        ref.read(humanColorProvider.notifier).set(
+              savedColor == 'black' ? PieceColor.black : PieceColor.white,
+            );
+      }
+
       // Restore last commentary text if available.
       final lastCommentary = savedData['lastCommentary'] as String?;
       final commentaryNotifier = ref.read(commentaryProvider.notifier);
@@ -714,7 +736,9 @@ class GameNotifier extends Notifier<GameState> {
           (!commentary.isLoading && !commentary.isError && commentary.text.isNotEmpty)
               ? commentary.text
               : null;
-      persistence.saveGame(variant.id, state, commentaryText);
+      final humanColor = ref.read(humanColorProvider);
+      persistence.saveGame(variant.id, state, commentaryText,
+          humanColor: humanColor);
     }
 
     // Invalidate the hasSavedGame cache so UI badges update.

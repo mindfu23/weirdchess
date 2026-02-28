@@ -234,7 +234,9 @@ class _VariantGrid extends ConsumerWidget {
             // Reset human colour to white before starting any new game so
             // we don't accidentally trigger AI before the Horde dialog shows.
             ref.read(humanColorProvider.notifier).set(PieceColor.white);
-            await ref.read(gameNotifierProvider.notifier).restoreGame(variant);
+            final wasRestored =
+                await ref.read(gameNotifierProvider.notifier).restoreGame(variant);
+            ref.read(gameRestoredProvider.notifier).set(wasRestored);
             if (context.mounted) context.go('/game');
           },
         );

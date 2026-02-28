@@ -27,11 +27,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final variant = ref.read(selectedVariantProvider);
-      if (variant.id == 'horde') {
+      final wasRestored = ref.read(gameRestoredProvider);
+      if (variant.id == 'horde' && !wasRestored) {
         // Clear the pending flag so ref.listen doesn't double-trigger.
         ref.read(pendingHordeSideSelectionProvider.notifier).set(false);
         _showHordeSideDialog();
       }
+      // Reset the restored flag so future navigations behave normally.
+      ref.read(gameRestoredProvider.notifier).set(false);
     });
   }
 
