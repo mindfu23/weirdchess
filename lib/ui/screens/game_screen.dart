@@ -6,7 +6,7 @@ import '../../engine/ai_opponent.dart';
 import '../../services/game_service.dart';
 import '../widgets/board_widget.dart';
 import '../widgets/score_panel.dart';
-import '../widgets/piece_info_panel.dart';
+
 import '../widgets/commentary_widget.dart';
 import '../widgets/pigeon_flash_overlay.dart';
 
@@ -179,13 +179,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           children: [
             // Main game content with commentary above board
             _buildGameContent(context),
-            // Piece info panel - positioned bottom right
-            // To relocate: change the Positioned parameters below
-            const Positioned(
-              right: 16,
-              bottom: 16,
-              child: PieceInfoPanel(),
-            ),
             // Pigeon chaos overlay — Standard Chess + chaos enabled only
             if (pigeonEvent != null &&
                 variant.id == 'standard_chess' &&
@@ -261,8 +254,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   padding: const EdgeInsets.all(8),
                   child: const ScorePanel(),
                 ),
-                // Add space at bottom for piece info panel overlay
-                const SizedBox(height: 120),
+                const SizedBox(height: 16),
               ],
             ),
           );

@@ -5,6 +5,7 @@ import '../../core/piece.dart';
 import '../../services/game_service.dart';
 import '../../variants/three_check.dart';
 import '../../variants/variant_base.dart';
+import 'piece_info_panel.dart';
 
 // ── Brand palette (mirrors home_screen / main.dart theme) ──────────────────
 const _kBackground = Color(0xFF1A1A1A);
@@ -92,6 +93,9 @@ class ScorePanel extends ConsumerWidget {
               ),
             ],
           ),
+
+          // Selected piece info — shown inline below controls
+          const PieceInfoPanel(),
         ],
       ),
     );

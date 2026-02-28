@@ -28,7 +28,7 @@ class PieceInfoPanel extends ConsumerWidget {
     final pieceInfo = variant.pieceInfo[piece.symbol];
     if (pieceInfo == null) return const SizedBox.shrink();
 
-    return PieceInfoCard(
+    return PieceInfoInline(
       piece: piece,
       name: pieceInfo.name,
       symbol: pieceInfo.symbol,
@@ -144,6 +144,101 @@ class PieceInfoCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Inline version of piece info for embedding in the score panel.
+/// No Card wrapper or maxWidth — inherits container width from parent.
+class PieceInfoInline extends StatelessWidget {
+  final Piece piece;
+  final String name;
+  final String symbol;
+  final int value;
+  final String movementDescription;
+
+  const PieceInfoInline({
+    super.key,
+    required this.piece,
+    required this.name,
+    required this.symbol,
+    required this.value,
+    required this.movementDescription,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isWhite = piece.color == PieceColor.white;
+    final colorName = isWhite ? 'White' : 'Black';
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 24, color: Color(0xFF4A5568)),
+        // Header with piece symbol and name
+        Row(
+          children: [
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isWhite ? Colors.white : const Color(0xFF1A1A1A),
+                border: Border.all(
+                  color: isWhite ? const Color(0xFF4A5568) : _kTextMuted,
+                  width: 2,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  symbol,
+                  style: TextStyle(
+                    color: isWhite ? const Color(0xFF1A1A1A) : Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _kTextPrimary,
+                  ),
+                ),
+                Text(
+                  '$colorName · Value: $value',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: _kTextMuted,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Movement',
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: _kTextMuted,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          movementDescription,
+          style: const TextStyle(fontSize: 12, color: _kTextPrimary),
+        ),
+      ],
     );
   }
 }
