@@ -1,8 +1,7 @@
 [build]
   # Pre-built Flutter web output
   publish = "build/web"
-  # No build command - files are pre-built
-  command = "echo 'Using pre-built Flutter web files'"
+  command = "bash scripts/build-web.sh"
   # Functions directory
   functions = "netlify/functions"
 

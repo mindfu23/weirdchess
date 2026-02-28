@@ -152,8 +152,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
             // Developer-only sections: hidden in release builds
             if (kDebugMode) ...[
-              // Provider Selection Section
-              _buildSectionHeader('LLM Provider'),
+              _buildSectionHeader('Developer Settings'),
+              // Provider Selection
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -184,8 +184,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // API Keys Section
-              _buildSectionHeader('API Keys'),
+              // API Keys
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -252,8 +251,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Advanced Settings
-              _buildSectionHeader('Advanced'),
+              // Advanced
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -285,8 +283,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Info Section
-              _buildSectionHeader('About AI Commentary'),
+              // About AI Commentary
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),
@@ -320,8 +317,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              _buildSectionHeader('Authentication'),
+              const SizedBox(height: 16),
+              // Authentication placeholder
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(16),

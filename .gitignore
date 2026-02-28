@@ -35,9 +35,8 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-# Ignore build folders except web (needed for Netlify)
-/build/*/
-!/build/web/
+# Build output (Netlify builds Flutter web automatically now)
+/build/
 /coverage/
 
 # Symbolication related
