@@ -1,9 +1,10 @@
 [build]
-  # Pre-built Flutter web output
   publish = "build/web"
   command = "bash scripts/build-web.sh"
-  # Functions directory
   functions = "netlify/functions"
+
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "APP_SECRET_TOKEN"
 
 # Redirects for SPA routing (exclude static assets and functions)
 [[redirects]]
