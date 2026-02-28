@@ -19,12 +19,15 @@ class CommentarySpeechBubble extends ConsumerWidget {
     // - We're in Netlify mode (directMode: false) where server has the API key
     final canShowCommentary = auth.isAuthenticated || !llmConfig.directMode;
 
-    if (!canShowCommentary) {
+    // Always show the bubble when there's text (e.g. system messages like
+    // "Your king is in check"), even if AI commentary is disabled.
+    // Only hide when there's genuinely nothing to display.
+    if (commentary.text.isEmpty && !commentary.isLoading) {
       return const SizedBox.shrink();
     }
 
-    // Don't show if no commentary
-    if (commentary.text.isEmpty && !commentary.isLoading) {
+    // Hide the loading spinner when AI commentary isn't available.
+    if (!canShowCommentary && commentary.isLoading) {
       return const SizedBox.shrink();
     }
 
@@ -192,8 +195,11 @@ class CommentaryBanner extends ConsumerWidget {
 
     final canShowCommentary = auth.isAuthenticated || !llmConfig.directMode;
 
-    if (!canShowCommentary ||
-        (commentary.text.isEmpty && !commentary.isLoading)) {
+    if (commentary.text.isEmpty && !commentary.isLoading) {
+      return const SizedBox.shrink();
+    }
+
+    if (!canShowCommentary && commentary.isLoading) {
       return const SizedBox.shrink();
     }
 

@@ -382,6 +382,22 @@ class GameNotifier extends Notifier<GameState> {
         await _makeMove(move);
         return;
       }
+
+      // If the king is in check and the user tapped a square that the
+      // selected piece could reach but can't because it doesn't resolve
+      // check, show a helpful message.
+      if (state.board.isInCheck(state.currentTurn)) {
+        final selectedPiece = state.board.getPiece(_selectedPosition!);
+        if (selectedPiece != null) {
+          final pseudoMoves =
+              selectedPiece.getPseudoLegalMoves(state.board, _selectedPosition!);
+          if (pseudoMoves.any((m) => m.to == position)) {
+            ref
+                .read(commentaryProvider.notifier)
+                .setCommentary("Can't do that. Your king is in check.");
+          }
+        }
+      }
     }
 
     if (piece != null && piece.color == state.currentTurn) {
