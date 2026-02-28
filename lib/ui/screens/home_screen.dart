@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/piece.dart';
 import '../../services/game_service.dart';
+import '../../services/scoreboard_service.dart';
 import '../../variants/variant_base.dart';
 
 /// Home screen with variant selection.
@@ -26,9 +27,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void initState() {
     super.initState();
     _tabController = TabController(
-      length: 2,
+      length: 3,
       vsync: this,
-      initialIndex: widget.initialTab.clamp(0, 1),
+      initialIndex: widget.initialTab.clamp(0, 2),
     );
   }
 
@@ -163,6 +164,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                           ],
                         ),
                       ),
+                      Tab(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: const [
+                            Text(
+                              'Scoreboard',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              'Win / Loss Stats',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
 
@@ -173,6 +196,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       children: [
                         _VariantGrid(variants: variants8x8),
                         _VariantGrid(variants: variants10x10),
+                        _ScoreboardTab(variants: variants),
                       ],
                     ),
                   ),
@@ -205,13 +229,13 @@ class _VariantGrid extends ConsumerWidget {
         final variant = variants[index];
         return _VariantCard(
           variant: variant,
-          onTap: () {
+          onTap: () async {
             ref.read(selectedVariantProvider.notifier).select(variant);
             // Reset human colour to white before starting any new game so
             // we don't accidentally trigger AI before the Horde dialog shows.
             ref.read(humanColorProvider.notifier).set(PieceColor.white);
-            ref.read(gameNotifierProvider.notifier).newGame(variant);
-            context.go('/game');
+            await ref.read(gameNotifierProvider.notifier).restoreGame(variant);
+            if (context.mounted) context.go('/game');
           },
         );
       },
@@ -219,7 +243,7 @@ class _VariantGrid extends ConsumerWidget {
   }
 }
 
-class _VariantCard extends StatelessWidget {
+class _VariantCard extends ConsumerWidget {
   final ChessVariant variant;
   final VoidCallback onTap;
 
@@ -257,9 +281,10 @@ class _VariantCard extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final boardSize = variant.boardSize;
     final sizeLabel = '$boardSize×$boardSize';
+    final hasSaved = ref.watch(hasSavedGameProvider(variant.id));
 
     return Material(
       color: const Color(0xFF2D3542),
@@ -274,25 +299,47 @@ class _VariantCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Size badge — top right
-              Align(
-                alignment: Alignment.centerRight,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1A1A1A),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    sizeLabel,
-                    style: const TextStyle(
-                      color: Color(0xFF9B8E85),
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+              // Badges — top right
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  // "In Progress" badge
+                  if (hasSaved.asData?.value == true)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4CAF82).withAlpha(30),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'In Progress',
+                        style: TextStyle(
+                          color: Color(0xFF4CAF82),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  // Size badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A1A1A),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      sizeLabel,
+                      style: const TextStyle(
+                        color: Color(0xFF9B8E85),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
 
               const SizedBox(height: 8),
@@ -378,6 +425,127 @@ class _VariantCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Scoreboard Tab ──────────────────────────────────────────────────────────
+
+class _ScoreboardTab extends ConsumerWidget {
+  final List<ChessVariant> variants;
+
+  const _ScoreboardTab({required this.variants});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scoreboard = ref.watch(scoreboardProvider);
+
+    // Only show variants that have at least one game played.
+    final played = variants
+        .where((v) => (scoreboard[v.id]?.gamesPlayed ?? 0) > 0)
+        .toList();
+
+    if (played.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text(
+            'No games completed yet.\nYour results will appear here.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Color(0xFF9B8E85), fontSize: 14),
+          ),
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      itemCount: played.length,
+      itemBuilder: (context, index) {
+        final variant = played[index];
+        final stats = scoreboard[variant.id]!;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2D3542),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              // Variant name + game count
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      variant.name,
+                      style: const TextStyle(
+                        color: Color(0xFFF5E6D3),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${stats.gamesPlayed} game${stats.gamesPlayed == 1 ? '' : 's'}',
+                      style: const TextStyle(
+                        color: Color(0xFF9B8E85),
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // W / L / D columns
+              _StatBadge(label: 'W', count: stats.wins, color: const Color(0xFF4CAF82)),
+              const SizedBox(width: 12),
+              _StatBadge(label: 'L', count: stats.losses, color: const Color(0xFFFF6B6B)),
+              const SizedBox(width: 12),
+              _StatBadge(label: 'D', count: stats.draws, color: const Color(0xFFFF9B8A)),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StatBadge extends StatelessWidget {
+  final String label;
+  final int count;
+  final Color color;
+
+  const _StatBadge({
+    required this.label,
+    required this.count,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '$count',
+          style: TextStyle(
+            color: color,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }

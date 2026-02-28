@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,6 +21,7 @@ import '../variants/horde.dart';
 import '../variants/fog_of_war.dart';
 import 'llm_service.dart';
 import 'auth_service.dart';
+import 'scoreboard_service.dart';
 
 /// All available chess variants — 8×8 variants first, then 10×10.
 final variantsProvider = Provider<List<ChessVariant>>((ref) {
@@ -211,11 +213,82 @@ final pigeonEventProvider =
     NotifierProvider<PigeonEventNotifier, PigeonEvent?>(
         PigeonEventNotifier.new);
 
+// ── Game persistence ────────────────────────────────────────────────────────
+
+/// Persists in-progress game state and last commentary per variant.
+class GamePersistenceService {
+  static const _prefix = 'weirdchess_saved_game_';
+
+  /// Save the current game + last commentary text for a variant.
+  Future<void> saveGame(
+    String variantId,
+    GameState gameState,
+    String? lastCommentary,
+  ) async {
+    if (gameState.isGameOver) {
+      await clearGame(variantId);
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final data = jsonEncode({
+      'gameState': gameState.toJson(),
+      'lastCommentary': lastCommentary,
+    });
+    await prefs.setString('$_prefix$variantId', data);
+  }
+
+  /// Save only the commentary text for a variant (used when commentary arrives
+  /// after the user has already navigated away).
+  Future<void> saveCommentary(String variantId, String commentary) async {
+    final prefs = await SharedPreferences.getInstance();
+    final existing = prefs.getString('$_prefix$variantId');
+    if (existing == null) return; // No saved game to attach commentary to
+    final map = jsonDecode(existing) as Map<String, dynamic>;
+    map['lastCommentary'] = commentary;
+    await prefs.setString('$_prefix$variantId', jsonEncode(map));
+  }
+
+  /// Load saved game data (returns null if none exists).
+  Future<Map<String, dynamic>?> loadGame(String variantId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final json = prefs.getString('$_prefix$variantId');
+    if (json == null) return null;
+    return jsonDecode(json) as Map<String, dynamic>;
+  }
+
+  /// Check if a saved game exists for a variant.
+  Future<bool> hasSavedGame(String variantId) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.containsKey('$_prefix$variantId');
+  }
+
+  /// Clear saved game for a variant.
+  Future<void> clearGame(String variantId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('$_prefix$variantId');
+  }
+}
+
+final gamePersistenceProvider = Provider<GamePersistenceService>((ref) {
+  return GamePersistenceService();
+});
+
+/// Whether a saved (in-progress) game exists for a given variant ID.
+final hasSavedGameProvider =
+    FutureProvider.family<bool, String>((ref, variantId) async {
+  return ref.read(gamePersistenceProvider).hasSavedGame(variantId);
+});
+
 /// Game state notifier
 class GameNotifier extends Notifier<GameState> {
   Position? _selectedPosition;
   List<Move> _selectedPieceMoves = [];
   bool _isAIThinking = false;
+
+  /// Incremented when the game context changes (new game, build rebuild).
+  /// Used to detect and handle stale async commentary responses.
+  int _commentaryGeneration = 0;
+
 
   @override
   GameState build() {
@@ -223,6 +296,7 @@ class GameNotifier extends Notifier<GameState> {
     _selectedPosition = null;
     _selectedPieceMoves = [];
     _isAIThinking = false;
+    _commentaryGeneration++;
     return variant.createNewGame();
   }
 
@@ -248,12 +322,18 @@ class GameNotifier extends Notifier<GameState> {
   }
 
   void newGame(ChessVariant variant) {
+    _commentaryGeneration++;
     state = variant.createNewGame();
     _selectedPosition = null;
     _selectedPieceMoves = [];
     _isAIThinking = false;
 
-    // Clear atomic explosion state for the new game.
+    // Clear saved game — user explicitly started fresh.
+    ref.read(gamePersistenceProvider).clearGame(variant.id);
+    ref.invalidate(hasSavedGameProvider(variant.id));
+
+    // Clear commentary and visual state for the new game.
+    ref.read(commentaryProvider.notifier).clear();
     ref.read(atomicCratersProvider.notifier).clear();
     ref.read(atomicExplosionEventProvider.notifier).clear();
 
@@ -324,6 +404,8 @@ class GameNotifier extends Notifier<GameState> {
       if (pigeonFired) {
         await Future.delayed(const Duration(seconds: 3));
       }
+
+      _autoSave();
 
       final playingAI = ref.read(playingAgainstAIProvider);
       final humanColor = ref.read(humanColorProvider);
@@ -419,10 +501,15 @@ class GameNotifier extends Notifier<GameState> {
     if (!auth.isAuthenticated && llmConfig.directMode) return;
     if (!llmConfig.enabled) return;
 
+    final variant = ref.read(selectedVariantProvider);
+    final variantId = variant.id;
     final llmService = ref.read(llmServiceProvider);
     final commentaryNotifier = ref.read(commentaryProvider.notifier);
 
     commentaryNotifier.setLoading();
+
+    final generation = _commentaryGeneration;
+
 
     final response = await llmService.generatePigeonCommentary(
       pieceName: event.pieceName,
@@ -432,6 +519,14 @@ class GameNotifier extends Notifier<GameState> {
       affectedAIPiece: event.affectedAIPiece,
       authHeader: auth.authHeader,
     );
+
+    // If the user switched games while waiting, save commentary for later.
+    if (generation != _commentaryGeneration) {
+      if (!response.isError && response.text.isNotEmpty) {
+        _saveCommentaryForVariant(variantId, response.text);
+      }
+      return;
+    }
 
     if (response.isError) {
       commentaryNotifier.setError(response.text);
@@ -470,6 +565,7 @@ class GameNotifier extends Notifier<GameState> {
 
     _isAIThinking = false;
     state = state.copy();
+    _autoSave();
   }
 
   Future<void> _generateCommentary(
@@ -481,13 +577,17 @@ class GameNotifier extends Notifier<GameState> {
     if (!llmConfig.enabled) return;
 
     final variant = ref.read(selectedVariantProvider);
+    final variantId = variant.id;
     final llmService = ref.read(llmServiceProvider);
     final commentaryNotifier = ref.read(commentaryProvider.notifier);
 
     commentaryNotifier.setLoading();
 
+    final generation = _commentaryGeneration;
+
+
     final response = await llmService.generateCommentary(
-      variantId: variant.id,
+      variantId: variantId,
       move: move,
       piece: piece,
       color: PieceColor.black,
@@ -496,6 +596,14 @@ class GameNotifier extends Notifier<GameState> {
       isCheckmate: state.result == GameResult.blackWins,
       authHeader: auth.authHeader,
     );
+
+    // If the user switched games while waiting, save commentary for later.
+    if (generation != _commentaryGeneration) {
+      if (!response.isError && response.text.isNotEmpty) {
+        _saveCommentaryForVariant(variantId, response.text);
+      }
+      return;
+    }
 
     if (response.isError) {
       commentaryNotifier.setError(response.text);
@@ -524,6 +632,98 @@ class GameNotifier extends Notifier<GameState> {
     _selectedPosition = null;
     _selectedPieceMoves = [];
     state = state.copy();
+  }
+
+  // ── Persistence ─────────────────────────────────────────────────────────────
+
+  /// Attempt to restore a saved game for the given variant.
+  /// Returns true if a game was restored, false if a new game was started.
+  Future<bool> restoreGame(ChessVariant variant) async {
+    final persistence = ref.read(gamePersistenceProvider);
+    final savedData = await persistence.loadGame(variant.id);
+
+    if (savedData == null) {
+      newGame(variant);
+      return false;
+    }
+
+    final gameJson = savedData['gameState'] as String?;
+    if (gameJson == null) {
+      newGame(variant);
+      return false;
+    }
+
+    try {
+      final restoredState = GameState.fromJson(gameJson, variant);
+      // Don't increment _commentaryGeneration — we want to accept any
+      // pending commentary for this variant.
+      state = restoredState;
+      _selectedPosition = null;
+      _selectedPieceMoves = [];
+      _isAIThinking = false;
+
+      // Restore last commentary text if available.
+      final lastCommentary = savedData['lastCommentary'] as String?;
+      final commentaryNotifier = ref.read(commentaryProvider.notifier);
+      if (lastCommentary != null && lastCommentary.isNotEmpty) {
+        commentaryNotifier.setCommentary(lastCommentary);
+      } else {
+        commentaryNotifier.clear();
+      }
+
+      // Clear visual state from other variants.
+      ref.read(atomicCratersProvider.notifier).clear();
+      ref.read(atomicExplosionEventProvider.notifier).clear();
+      ref.read(pigeonEventProvider.notifier).clear();
+
+      // If it's the AI's turn, trigger its move.
+      final playingAI = ref.read(playingAgainstAIProvider);
+      final humanColor = ref.read(humanColorProvider);
+      if (playingAI && !state.isGameOver && state.currentTurn != humanColor) {
+        _makeAIMove();
+      }
+
+      return true;
+    } catch (e) {
+      // If restoration fails, start a new game and clear bad data.
+      await persistence.clearGame(variant.id);
+      newGame(variant);
+      return false;
+    }
+  }
+
+  /// Save current game state + commentary after each move.
+  /// Records scoreboard result when a game finishes.
+  void _autoSave() {
+    final variant = ref.read(selectedVariantProvider);
+    final persistence = ref.read(gamePersistenceProvider);
+    final commentary = ref.read(commentaryProvider);
+
+    if (state.isGameOver) {
+      persistence.clearGame(variant.id);
+
+      // Record win/loss/draw on the scoreboard.
+      final humanColor = ref.read(humanColorProvider);
+      ref.read(scoreboardProvider.notifier).recordResult(
+            variant.id,
+            state.result,
+            humanColor,
+          );
+    } else {
+      final commentaryText =
+          (!commentary.isLoading && !commentary.isError && commentary.text.isNotEmpty)
+              ? commentary.text
+              : null;
+      persistence.saveGame(variant.id, state, commentaryText);
+    }
+
+    // Invalidate the hasSavedGame cache so UI badges update.
+    ref.invalidate(hasSavedGameProvider(variant.id));
+  }
+
+  /// Save a late-arriving commentary response to a variant's persistence.
+  void _saveCommentaryForVariant(String variantId, String text) {
+    ref.read(gamePersistenceProvider).saveCommentary(variantId, text);
   }
 }
 

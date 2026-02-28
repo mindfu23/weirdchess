@@ -278,6 +278,12 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
 
         return CommentaryResponse.error(response.text, retryCount: attempt);
       } catch (e) {
+        if (_isConnectivityError(e)) {
+          return CommentaryResponse.error(
+            'No internet connection \u2014 commentary will return when you\u2019re back online.',
+            retryCount: attempt,
+          );
+        }
         attempt++;
         if (attempt < config.maxRetries && _isRetryableException(e)) {
           debugPrint('LLM API exception (attempt $attempt/${config.maxRetries}): $e');
@@ -285,11 +291,17 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
           delay *= 2;
           continue;
         }
-        return CommentaryResponse.error('Connection error: $e', retryCount: attempt);
+        return CommentaryResponse.error(
+          'Could not reach the commentary service. Please check your connection.',
+          retryCount: attempt,
+        );
       }
     }
 
-    return CommentaryResponse.error('Max retries exceeded', retryCount: attempt);
+    return CommentaryResponse.error(
+      'Commentary temporarily unavailable. Check your connection.',
+      retryCount: attempt,
+    );
   }
 
   /// Check if an error response is retryable.
@@ -306,6 +318,19 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
         errorStr.contains('connection') ||
         errorStr.contains('socket') ||
         errorStr.contains('network');
+  }
+
+  /// Returns true when the exception clearly indicates no network connectivity
+  /// (as opposed to a transient server-side error). These should not be retried.
+  bool _isConnectivityError(dynamic e) {
+    final s = e.toString().toLowerCase();
+    return s.contains('socketexception') ||
+        s.contains('no address associated with hostname') ||
+        s.contains('network is unreachable') ||
+        s.contains('connection refused') ||
+        s.contains('failed host lookup') ||
+        s.contains('no internet') ||
+        s.contains('no route to host');
   }
 
   /// Call the Netlify function endpoint.
@@ -543,18 +568,29 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
 
         return CommentaryResponse.error(response.text, retryCount: attempt);
       } catch (e) {
+        if (_isConnectivityError(e)) {
+          return CommentaryResponse.error(
+            'No internet connection \u2014 commentary will return when you\u2019re back online.',
+            retryCount: attempt,
+          );
+        }
         attempt++;
         if (attempt < config.maxRetries && _isRetryableException(e)) {
           await Future.delayed(delay);
           delay *= 2;
           continue;
         }
-        return CommentaryResponse.error('Connection error: $e',
-            retryCount: attempt);
+        return CommentaryResponse.error(
+          'Could not reach the commentary service. Please check your connection.',
+          retryCount: attempt,
+        );
       }
     }
 
-    return CommentaryResponse.error('Max retries exceeded', retryCount: attempt);
+    return CommentaryResponse.error(
+      'Commentary temporarily unavailable. Check your connection.',
+      retryCount: attempt,
+    );
   }
 
   String _describeMove(

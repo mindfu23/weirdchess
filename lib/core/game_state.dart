@@ -507,6 +507,117 @@ class GameState {
     return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')}';
   }
 
+  /// Restore a [GameState] from JSON produced by [toJson].
+  ///
+  /// Reconstructs the board from the embedded FEN string using the variant's
+  /// [ChessVariantInterface.createPiece] to instantiate the correct piece types.
+  /// Move history is NOT restored — undo will not work for pre-save moves.
+  static GameState fromJson(String json, ChessVariantInterface variant) {
+    final map = jsonDecode(json) as Map<String, dynamic>;
+    final fen = map['fen'] as String;
+    final boardSize = map['boardSize'] as int? ?? 8;
+    final turnName = map['currentTurn'] as String? ?? 'white';
+    final resultName = map['result'] as String? ?? 'ongoing';
+    final halfMoveClock = map['halfMoveClock'] as int? ?? 0;
+    final fullMoveNumber = map['fullMoveNumber'] as int? ?? 1;
+    final variantData =
+        (map['variantData'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+    final variantName = map['variantName'] as String? ?? '';
+
+    // Parse FEN
+    final parts = fen.split(' ');
+    final boardStr = parts[0];
+
+    final board = Board(size: boardSize);
+    final rows = boardStr.split('/');
+    for (int row = 0; row < rows.length && row < boardSize; row++) {
+      int col = 0;
+      for (int i = 0; i < rows[row].length && col < boardSize; i++) {
+        final ch = rows[row][i];
+        if (RegExp(r'\d').hasMatch(ch)) {
+          // Handle multi-digit numbers for 10x10 boards
+          String numStr = ch;
+          while (i + 1 < rows[row].length &&
+              RegExp(r'\d').hasMatch(rows[row][i + 1])) {
+            i++;
+            numStr += rows[row][i];
+          }
+          col += int.parse(numStr);
+        } else {
+          final color =
+              ch == ch.toUpperCase() ? PieceColor.white : PieceColor.black;
+          final symbol = ch.toUpperCase();
+          try {
+            final piece = variant.createPiece(symbol, color);
+            piece.hasMoved = true; // Default: assume moved
+            board.setPiece(Position(row, col), piece);
+          } catch (_) {
+            // Unknown piece symbol — skip
+          }
+          col++;
+        }
+      }
+    }
+
+    // Restore castling rights from FEN
+    if (parts.length > 2 && parts[2] != '-') {
+      final castling = parts[2];
+      if (castling.contains('K') || castling.contains('Q')) {
+        final kingPos = board.findKing(PieceColor.white);
+        if (kingPos != null) {
+          board.getPiece(kingPos)?.hasMoved = false;
+        }
+        if (castling.contains('K')) {
+          final rook =
+              board.getPiece(Position(boardSize - 1, boardSize - 1));
+          if (rook != null) rook.hasMoved = false;
+        }
+        if (castling.contains('Q')) {
+          final rook = board.getPiece(Position(boardSize - 1, 0));
+          if (rook != null) rook.hasMoved = false;
+        }
+      }
+      if (castling.contains('k') || castling.contains('q')) {
+        final kingPos = board.findKing(PieceColor.black);
+        if (kingPos != null) {
+          board.getPiece(kingPos)?.hasMoved = false;
+        }
+        if (castling.contains('k')) {
+          final rook = board.getPiece(Position(0, boardSize - 1));
+          if (rook != null) rook.hasMoved = false;
+        }
+        if (castling.contains('q')) {
+          final rook = board.getPiece(Position(0, 0));
+          if (rook != null) rook.hasMoved = false;
+        }
+      }
+    }
+
+    // Restore en passant target
+    if (parts.length > 3 && parts[3] != '-') {
+      board.enPassantTarget = Position.fromAlgebraic(parts[3], boardSize);
+    }
+
+    final turn =
+        turnName == 'black' ? PieceColor.black : PieceColor.white;
+
+    final result = GameResult.values.firstWhere(
+      (r) => r.name == resultName,
+      orElse: () => GameResult.ongoing,
+    );
+
+    return GameState(
+      board: board,
+      variantName: variantName,
+      currentTurn: turn,
+      result: result,
+      halfMoveClock: halfMoveClock,
+      fullMoveNumber: fullMoveNumber,
+      variant: variant,
+      variantData: Map<String, dynamic>.from(variantData),
+    );
+  }
+
   String toJson() {
     return jsonEncode({
       'variantName': variantName,
