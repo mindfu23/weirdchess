@@ -412,51 +412,87 @@ class ScorePanel extends ConsumerWidget {
     );
   }
 
-  Widget _buildColorToggle(WidgetRef ref, dynamic notifier, ChessVariant variant) {
+  Widget _buildColorToggle(
+      WidgetRef ref, dynamic notifier, ChessVariant variant) {
     final humanColor = ref.watch(humanColorProvider);
-    final isWhite = humanColor == PieceColor.white;
+    final colorChosen = ref.watch(colorChosenProvider);
 
-    return GestureDetector(
-      onTap: () {
-        final newColor =
-            isWhite ? PieceColor.black : PieceColor.white;
-        ref.read(humanColorProvider.notifier).set(newColor);
+    void selectColor(PieceColor color) {
+      if (colorChosen) return; // locked after first pick
+      ref.read(humanColorProvider.notifier).set(color);
+      ref.read(colorChosenProvider.notifier).set(true);
+      if (color != PieceColor.white) {
+        // Restart so the AI takes the first move.
         if (variant.id == 'horde') {
           ref
               .read(pendingHordeSideSelectionProvider.notifier)
               .set(true);
         } else {
           notifier.newGame(variant);
+          // Re-lock — newGame resets colorChosen, so set it again.
+          ref.read(colorChosenProvider.notifier).set(true);
         }
-      },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Text(
-            'Play as:',
-            style: TextStyle(fontSize: 13, color: _kTextMuted),
+      }
+    }
+
+    Widget radioOption(PieceColor color) {
+      final isSelected = colorChosen && humanColor == color;
+      final label = color == PieceColor.white ? 'White' : 'Black';
+      final dotColor =
+          color == PieceColor.white ? Colors.white : _kBackground;
+
+      return GestureDetector(
+        onTap: colorChosen ? null : () => selectColor(color),
+        child: Opacity(
+          opacity: colorChosen && !isSelected ? 0.4 : 1.0,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: isSelected ? dotColor : Colors.transparent,
+                  border: Border.all(
+                    color: isSelected ? _kAccent : _kTextMuted,
+                    width: 1.5,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 5),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.normal,
+                  color: isSelected ? _kTextPrimary : _kTextMuted,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Container(
-            width: 18,
-            height: 18,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isWhite ? Colors.white : _kBackground,
-              border: Border.all(color: _kTextMuted, width: 1.5),
-            ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'Play as:',
+          style: TextStyle(
+            fontSize: 13,
+            color: colorChosen ? _kTextMuted : _kAccent,
+            fontWeight:
+                colorChosen ? FontWeight.normal : FontWeight.w600,
           ),
-          const SizedBox(width: 6),
-          Text(
-            isWhite ? 'White' : 'Black',
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: _kTextPrimary,
-            ),
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        radioOption(PieceColor.white),
+        const SizedBox(width: 16),
+        radioOption(PieceColor.black),
+      ],
     );
   }
 

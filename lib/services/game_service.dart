@@ -167,6 +167,18 @@ class HumanColorNotifier extends Notifier<PieceColor> {
 final humanColorProvider =
     NotifierProvider<HumanColorNotifier, PieceColor>(HumanColorNotifier.new);
 
+/// Whether the player has explicitly chosen a side for the current game.
+/// Resets to false on new game; becomes true when the player picks a color.
+class ColorChosenNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  void set(bool value) => state = value;
+}
+
+final colorChosenProvider =
+    NotifierProvider<ColorChosenNotifier, bool>(ColorChosenNotifier.new);
+
 /// Set to true to signal the game screen to show the Horde side-selection dialog.
 class PendingHordeSideSelectionNotifier extends Notifier<bool> {
   @override
@@ -387,6 +399,9 @@ class GameNotifier extends Notifier<GameState> {
 
     // Clear any stale pigeon event so it doesn't bleed into the new game/variant.
     ref.read(pigeonEventProvider.notifier).clear();
+
+    // Reset color selection so the player can pick again.
+    ref.read(colorChosenProvider.notifier).set(false);
 
     // If the AI should move first (human plays a non-first-turn colour), start AI.
     final playingAI = ref.read(playingAgainstAIProvider);
