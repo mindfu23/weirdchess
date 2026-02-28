@@ -231,6 +231,7 @@ class LlmService {
     Piece? capturedPiece,
     bool isCheck = false,
     bool isCheckmate = false,
+    bool pigeonChaosEnabled = false,
     String? authHeader,
   }) async {
     if (!config.enabled) {
@@ -241,6 +242,13 @@ class LlmService {
     }
 
     final personality = VariantPersonalities.forVariant(variantId);
+    // Append pigeon context only when chaos mode is active for standard chess.
+    var systemPrompt = personality.systemPrompt;
+    if (pigeonChaosEnabled && variantId == 'standard_chess') {
+      systemPrompt += '\n'
+          'Occasionally, a pigeon may land on the board and scatter a piece to a random square. '
+          'When this happens, react with exasperation and dark humor — pigeons are the bane of serious chess.';
+    }
     final colorName = color == PieceColor.white ? 'White' : 'Black';
     final moveDesc = _describeMove(move, piece, capturedPiece, isCheck, isCheckmate);
 
@@ -258,8 +266,8 @@ Generate a brief (1-2 sentence) commentary on this move in character.''';
     while (attempt < config.maxRetries) {
       try {
         final response = config.directMode
-            ? await _callProviderDirect(personality.systemPrompt, prompt, authHeader!)
-            : await _callNetlifyFunction(personality.systemPrompt, prompt, variantId, authHeader);
+            ? await _callProviderDirect(systemPrompt, prompt, authHeader!)
+            : await _callNetlifyFunction(systemPrompt, prompt, variantId, authHeader);
 
         if (!response.isError) {
           return response;

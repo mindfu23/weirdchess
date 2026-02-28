@@ -303,6 +303,10 @@ class GameNotifier extends Notifier<GameState> {
   /// Used to detect and handle stale async commentary responses.
   int _commentaryGeneration = 0;
 
+  /// Counts human moves since the last new game. Used to trigger pigeon chaos
+  /// at predictable intervals, independent of AI move count.
+  int _pigeonMoveCounter = 0;
+
 
   @override
   GameState build() {
@@ -311,6 +315,7 @@ class GameNotifier extends Notifier<GameState> {
     _selectedPieceMoves = [];
     _isAIThinking = false;
     _commentaryGeneration++;
+    _pigeonMoveCounter = 0;
     return variant.createNewGame();
   }
 
@@ -337,6 +342,7 @@ class GameNotifier extends Notifier<GameState> {
 
   void newGame(ChessVariant variant) {
     _commentaryGeneration++;
+    _pigeonMoveCounter = 0;
     state = variant.createNewGame();
     _selectedPosition = null;
     _selectedPieceMoves = [];
@@ -425,10 +431,11 @@ class GameNotifier extends Notifier<GameState> {
       bool pigeonFired = false;
       final variant = ref.read(selectedVariantProvider);
       final chaosEnabled = ref.read(chaosModeProvider);
+      _pigeonMoveCounter++;
       if (chaosEnabled &&
           variant.id == 'standard_chess' &&
-          state.moveHistory.length >= 5 &&
-          state.moveHistory.length % 5 == 0) {
+          _pigeonMoveCounter >= 5 &&
+          _pigeonMoveCounter % 5 == 0) {
         pigeonFired = _triggerPigeonChaos();
       }
 
@@ -625,6 +632,7 @@ class GameNotifier extends Notifier<GameState> {
       capturedPiece: capturedPiece,
       isCheck: state.board.isInCheck(PieceColor.white),
       isCheckmate: state.result == GameResult.blackWins,
+      pigeonChaosEnabled: ref.read(chaosModeProvider),
       authHeader: auth.authHeader,
     );
 
@@ -692,6 +700,9 @@ class GameNotifier extends Notifier<GameState> {
       _selectedPosition = null;
       _selectedPieceMoves = [];
       _isAIThinking = false;
+      // Approximate the human move counter from total half-moves
+      // (roughly half belong to the human).
+      _pigeonMoveCounter = (restoredState.moveHistory.length + 1) ~/ 2;
 
       // Restore the human colour that was active when the game was saved.
       final savedColor = savedData['humanColor'] as String?;
