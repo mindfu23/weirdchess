@@ -49,6 +49,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Android signing
+android/app/key.properties
+android/app/*.jks
+android/app/*.keystore
 .netlify/
 *.dill
 
