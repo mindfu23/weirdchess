@@ -360,10 +360,13 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       pageBuilder: (ctx, anim1, anim2) {
         return Stack(
           children: [
-            // Invisible full-screen tap target to dismiss (replaces barrier).
+            // Invisible full-screen target to dismiss on a new touch-down.
+            // Using Listener.onPointerDown instead of GestureDetector.onTap
+            // so that residual touch-up events from the icon button can't
+            // accidentally close the dropdown.
             Positioned.fill(
-              child: GestureDetector(
-                onTap: () => Navigator.pop(ctx),
+              child: Listener(
+                onPointerDown: (_) => Navigator.pop(ctx),
                 behavior: HitTestBehavior.opaque,
                 child: const SizedBox.expand(),
               ),
