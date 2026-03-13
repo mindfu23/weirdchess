@@ -19,6 +19,8 @@ class GameScreen extends ConsumerStatefulWidget {
 }
 
 class _GameScreenState extends ConsumerState<GameScreen> {
+  final _difficultyKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -243,18 +245,25 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           // Difficulty selector — use IconButton + showMenu so we can defer
           // the popup past the touch-up event on iOS/iPadOS.
           IconButton(
+            key: _difficultyKey,
             icon: const Icon(Icons.psychology),
             tooltip: 'AI Difficulty',
             onPressed: () {
-              // Find the button's position for menu anchoring.
-              final RenderBox button = context.findRenderObject() as RenderBox;
-              final overlay = Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
-              final position = RelativeRect.fromRect(
-                Rect.fromPoints(
-                  button.localToGlobal(Offset.zero, ancestor: overlay),
-                  button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
-                ),
-                Offset.zero & overlay.size,
+              // Find the button's position for menu anchoring using its GlobalKey.
+              final RenderBox button =
+                  _difficultyKey.currentContext!.findRenderObject() as RenderBox;
+              final overlay = Navigator.of(context)
+                  .overlay!
+                  .context
+                  .findRenderObject() as RenderBox;
+              final buttonRect = Rect.fromPoints(
+                button.localToGlobal(Offset.zero, ancestor: overlay),
+                button.localToGlobal(button.size.bottomRight(Offset.zero),
+                    ancestor: overlay),
+              );
+              final position = RelativeRect.fromSize(
+                buttonRect,
+                overlay.size,
               );
               // Defer past the touch-up event cycle.
               WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -262,10 +271,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   context: context,
                   position: position,
                   items: [
-                    _buildDifficultyItem(AIDifficulty.beginner, 'Beginner', difficulty),
-                    _buildDifficultyItem(AIDifficulty.easy, 'Easy', difficulty),
-                    _buildDifficultyItem(AIDifficulty.medium, 'Medium', difficulty),
-                    _buildDifficultyItem(AIDifficulty.hard, 'Hard', difficulty),
+                    _buildDifficultyItem(
+                        AIDifficulty.beginner, 'Beginner', difficulty),
+                    _buildDifficultyItem(
+                        AIDifficulty.easy, 'Easy', difficulty),
+                    _buildDifficultyItem(
+                        AIDifficulty.medium, 'Medium', difficulty),
+                    _buildDifficultyItem(
+                        AIDifficulty.hard, 'Hard', difficulty),
                   ],
                 ).then((value) {
                   if (value != null) {
