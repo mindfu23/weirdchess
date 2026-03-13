@@ -19,8 +19,6 @@ class GameScreen extends ConsumerStatefulWidget {
 }
 
 class _GameScreenState extends ConsumerState<GameScreen> {
-  final _difficultyKey = GlobalKey();
-
   @override
   void initState() {
     super.initState();
@@ -242,50 +240,12 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 ),
               ),
             ),
-          // Difficulty selector — use IconButton + showMenu so we can defer
-          // the popup past the touch-up event on iOS/iPadOS.
+          // Difficulty selector — use a dialog (barrierDismissible: false)
+          // so iPadOS touch-up events don't immediately dismiss it.
           IconButton(
-            key: _difficultyKey,
             icon: const Icon(Icons.psychology),
             tooltip: 'AI Difficulty',
-            onPressed: () {
-              // Find the button's position for menu anchoring using its GlobalKey.
-              final RenderBox button =
-                  _difficultyKey.currentContext!.findRenderObject() as RenderBox;
-              final overlay = Navigator.of(context)
-                  .overlay!
-                  .context
-                  .findRenderObject() as RenderBox;
-              final buttonPos =
-                  button.localToGlobal(Offset.zero, ancestor: overlay);
-              final position = RelativeRect.fromLTRB(
-                buttonPos.dx,
-                buttonPos.dy + button.size.height,
-                overlay.size.width - buttonPos.dx - button.size.width,
-                0,
-              );
-              // Defer past the touch-up event cycle.
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                showMenu<AIDifficulty>(
-                  context: context,
-                  position: position,
-                  items: [
-                    _buildDifficultyItem(
-                        AIDifficulty.beginner, 'Beginner', difficulty),
-                    _buildDifficultyItem(
-                        AIDifficulty.easy, 'Easy', difficulty),
-                    _buildDifficultyItem(
-                        AIDifficulty.medium, 'Medium', difficulty),
-                    _buildDifficultyItem(
-                        AIDifficulty.hard, 'Hard', difficulty),
-                  ],
-                ).then((value) {
-                  if (value != null) {
-                    ref.read(aiDifficultyProvider.notifier).set(value);
-                  }
-                });
-              });
-            },
+            onPressed: () => _showDifficultyDialog(context, difficulty),
           ),
           // Rules button
           IconButton(
@@ -384,24 +344,47 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  PopupMenuItem<AIDifficulty> _buildDifficultyItem(
-    AIDifficulty value,
-    String label,
-    AIDifficulty current,
-  ) {
-    return PopupMenuItem(
-      value: value,
-      child: Row(
-        children: [
-          if (value == current)
-            const Icon(Icons.check, size: 18)
-          else
-            const SizedBox(width: 18),
-          const SizedBox(width: 8),
-          Text(label),
+  void _showDifficultyDialog(BuildContext context, AIDifficulty current) {
+    showDialog<AIDifficulty>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF2D3542),
+        title: const Text(
+          'AI Difficulty',
+          style: TextStyle(
+            fontFamily: 'Righteous',
+            color: Color(0xFFF5E6D3),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: AIDifficulty.values.map((level) {
+            final label = level.name[0].toUpperCase() + level.name.substring(1);
+            return ListTile(
+              leading: level == current
+                  ? const Icon(Icons.check, color: Color(0xFFF5E6D3), size: 18)
+                  : const SizedBox(width: 18),
+              title: Text(
+                label,
+                style: const TextStyle(color: Color(0xFFF5E6D3)),
+              ),
+              onTap: () => Navigator.pop(ctx, level),
+            );
+          }).toList(),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
         ],
       ),
-    );
+    ).then((value) {
+      if (value != null) {
+        ref.read(aiDifficultyProvider.notifier).set(value);
+      }
+    });
   }
 
   void _showRulesDialog(BuildContext context, variant) {
