@@ -19,6 +19,8 @@ class GameScreen extends ConsumerStatefulWidget {
 }
 
 class _GameScreenState extends ConsumerState<GameScreen> {
+  final _difficultyKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
@@ -240,12 +242,13 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 ),
               ),
             ),
-          // Difficulty selector — use a dialog (barrierDismissible: false)
-          // so iPadOS touch-up events don't immediately dismiss it.
+          // Difficulty selector — positioned dropdown with non-dismissible
+          // barrier so iPadOS touch-up events don't close it immediately.
           IconButton(
+            key: _difficultyKey,
             icon: const Icon(Icons.psychology),
             tooltip: 'AI Difficulty',
-            onPressed: () => _showDifficultyDialog(context, difficulty),
+            onPressed: () => _showDifficultyDropdown(context, difficulty),
           ),
           // Rules button
           IconButton(
@@ -344,42 +347,78 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  void _showDifficultyDialog(BuildContext context, AIDifficulty current) {
-    showDialog<AIDifficulty>(
+  void _showDifficultyDropdown(BuildContext context, AIDifficulty current) {
+    final RenderBox button =
+        _difficultyKey.currentContext!.findRenderObject() as RenderBox;
+    final buttonPos = button.localToGlobal(Offset.zero);
+    final buttonSize = button.size;
+
+    showGeneralDialog<AIDifficulty>(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF2D3542),
-        title: const Text(
-          'AI Difficulty',
-          style: TextStyle(
-            fontFamily: 'Righteous',
-            color: Color(0xFFF5E6D3),
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: AIDifficulty.values.map((level) {
-            final label = level.name[0].toUpperCase() + level.name.substring(1);
-            return ListTile(
-              leading: level == current
-                  ? const Icon(Icons.check, color: Color(0xFFF5E6D3), size: 18)
-                  : const SizedBox(width: 18),
-              title: Text(
-                label,
-                style: const TextStyle(color: Color(0xFFF5E6D3)),
+      barrierColor: Colors.transparent,
+      pageBuilder: (ctx, anim1, anim2) {
+        return Stack(
+          children: [
+            // Invisible full-screen tap target to dismiss (replaces barrier).
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: () => Navigator.pop(ctx),
+                behavior: HitTestBehavior.opaque,
+                child: const SizedBox.expand(),
               ),
-              onTap: () => Navigator.pop(ctx, level),
-            );
-          }).toList(),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-        ],
-      ),
+            ),
+            // Dropdown menu positioned directly below the icon.
+            Positioned(
+              top: buttonPos.dy + buttonSize.height,
+              right: MediaQuery.of(context).size.width -
+                  buttonPos.dx -
+                  buttonSize.width,
+              child: Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(8),
+                color: const Color(0xFF2D3542),
+                child: IntrinsicWidth(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: AIDifficulty.values.map((level) {
+                      final label = level.name[0].toUpperCase() +
+                          level.name.substring(1);
+                      return InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: () => Navigator.pop(ctx, level),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (level == current)
+                                const Icon(Icons.check,
+                                    color: Color(0xFFF5E6D3), size: 18)
+                              else
+                                const SizedBox(width: 18),
+                              const SizedBox(width: 8),
+                              Text(
+                                label,
+                                style: const TextStyle(
+                                  color: Color(0xFFF5E6D3),
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     ).then((value) {
       if (value != null) {
         ref.read(aiDifficultyProvider.notifier).set(value);
