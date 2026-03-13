@@ -45,6 +45,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 
   Future<void> _saveSettings() async {
+    // Dismiss the iOS soft keyboard before saving.
+    FocusScope.of(context).unfocus();
+
     final configService = ref.read(configServiceProvider);
     final baseUrl = _baseUrlController.text.trim();
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/piece.dart';
 import '../../services/game_service.dart';
@@ -23,6 +24,7 @@ class _PigeonFlashOverlayState extends State<PigeonFlashOverlay>
   late final Animation<double> _opacity;
   late final Animation<double> _flyX;
   late final Animation<double> _flyY;
+  Timer? _flyDelayTimer;
 
   @override
   void initState() {
@@ -86,13 +88,15 @@ class _PigeonFlashOverlayState extends State<PigeonFlashOverlay>
 
     _fadeController.forward();
     // Small delay before pigeon flies so the amber background is visible first.
-    Future.delayed(const Duration(milliseconds: 150), () {
+    // Use a cancellable Timer so it's cleaned up if the widget is disposed early.
+    _flyDelayTimer = Timer(const Duration(milliseconds: 150), () {
       if (mounted) _flyController.forward();
     });
   }
 
   @override
   void dispose() {
+    _flyDelayTimer?.cancel();
     _fadeController.dispose();
     _flyController.dispose();
     super.dispose();

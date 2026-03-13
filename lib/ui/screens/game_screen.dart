@@ -240,19 +240,40 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 ),
               ),
             ),
-          // Difficulty selector
-          PopupMenuButton<AIDifficulty>(
+          // Difficulty selector — use IconButton + showMenu so we can defer
+          // the popup past the touch-up event on iOS/iPadOS.
+          IconButton(
             icon: const Icon(Icons.psychology),
             tooltip: 'AI Difficulty',
-            onSelected: (value) {
-              ref.read(aiDifficultyProvider.notifier).set(value);
+            onPressed: () {
+              // Find the button's position for menu anchoring.
+              final RenderBox button = context.findRenderObject() as RenderBox;
+              final overlay = Navigator.of(context).overlay!.context.findRenderObject() as RenderBox;
+              final position = RelativeRect.fromRect(
+                Rect.fromPoints(
+                  button.localToGlobal(Offset.zero, ancestor: overlay),
+                  button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
+                ),
+                Offset.zero & overlay.size,
+              );
+              // Defer past the touch-up event cycle.
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                showMenu<AIDifficulty>(
+                  context: context,
+                  position: position,
+                  items: [
+                    _buildDifficultyItem(AIDifficulty.beginner, 'Beginner', difficulty),
+                    _buildDifficultyItem(AIDifficulty.easy, 'Easy', difficulty),
+                    _buildDifficultyItem(AIDifficulty.medium, 'Medium', difficulty),
+                    _buildDifficultyItem(AIDifficulty.hard, 'Hard', difficulty),
+                  ],
+                ).then((value) {
+                  if (value != null) {
+                    ref.read(aiDifficultyProvider.notifier).set(value);
+                  }
+                });
+              });
             },
-            itemBuilder: (context) => [
-              _buildDifficultyItem(AIDifficulty.beginner, 'Beginner', difficulty),
-              _buildDifficultyItem(AIDifficulty.easy, 'Easy', difficulty),
-              _buildDifficultyItem(AIDifficulty.medium, 'Medium', difficulty),
-              _buildDifficultyItem(AIDifficulty.hard, 'Hard', difficulty),
-            ],
           ),
           // Rules button
           IconButton(
@@ -374,6 +395,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   void _showRulesDialog(BuildContext context, variant) {
     showDialog(
       context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         title: Text('${variant.name} Rules'),
         content: SingleChildScrollView(
