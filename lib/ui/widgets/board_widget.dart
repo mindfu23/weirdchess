@@ -5,6 +5,7 @@ import '../../core/piece.dart';
 import '../../services/game_service.dart';
 import '../../variants/king_of_the_hill.dart';
 import 'atomic_explosion_overlay.dart';
+import 'move_animation_overlay.dart';
 import 'piece_widget.dart';
 
 /// Widget that displays the chess board.
@@ -50,6 +51,12 @@ class BoardWidget extends ConsumerWidget {
                   darkColor: variant.darkSquareColor,
                 );
               },
+            ),
+            // Piece move animation overlay (slide + capture fade).
+            Positioned.fill(
+              child: IgnorePointer(
+                child: MoveAnimationOverlay(boardSize: boardSize),
+              ),
             ),
             // Atomic explosion animation — only active for Atomic Chess.
             if (variant.id == 'atomic')
@@ -99,9 +106,21 @@ class _SquareWidget extends ConsumerWidget {
 
     // Hide opponent pieces that are in fog.
     final rawPiece = gameState.board.getPiece(position);
-    final piece = (isInFog && rawPiece?.color != gameState.currentTurn)
+    var piece = (isInFog && rawPiece?.color != gameState.currentTurn)
         ? null
         : rawPiece;
+
+    // During move animation, suppress the piece at the destination (and
+    // castling rook positions) so the overlay's sliding copy is the only
+    // one visible.
+    final animEvent = ref.watch(moveAnimationEventProvider);
+    if (animEvent != null) {
+      if (position == animEvent.to ||
+          position == animEvent.secondaryTo ||
+          position == animEvent.secondaryFrom) {
+        piece = null;
+      }
+    }
 
     // Check if this square is selected or a valid move destination.
     final isSelected = notifier.selectedPosition == position;
@@ -178,7 +197,7 @@ class _SquareWidget extends ConsumerWidget {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final pieceSize = constraints.maxWidth * 0.8;
-                    return PieceWidget(piece: piece, size: pieceSize);
+                    return PieceWidget(piece: piece!, size: pieceSize);
                   },
                 ),
               ),

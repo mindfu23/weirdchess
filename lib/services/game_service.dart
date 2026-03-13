@@ -236,6 +236,43 @@ final pigeonEventProvider =
     NotifierProvider<PigeonEventNotifier, PigeonEvent?>(
         PigeonEventNotifier.new);
 
+// ── Piece move animation ─────────────────────────────────────────────────────
+
+/// Describes a piece-move animation event (slide from → to, optional capture fade).
+class MoveAnimationEvent {
+  final Position from;
+  final Position to;
+  final Piece piece;
+  final Piece? capturedPiece;
+  /// For castling: secondary piece (rook) animation.
+  final Position? secondaryFrom;
+  final Position? secondaryTo;
+  final Piece? secondaryPiece;
+
+  const MoveAnimationEvent({
+    required this.from,
+    required this.to,
+    required this.piece,
+    this.capturedPiece,
+    this.secondaryFrom,
+    this.secondaryTo,
+    this.secondaryPiece,
+  });
+}
+
+/// Active move animation; null when idle.
+class MoveAnimationEventNotifier extends Notifier<MoveAnimationEvent?> {
+  @override
+  MoveAnimationEvent? build() => null;
+
+  void trigger(MoveAnimationEvent event) => state = event;
+  void clear() => state = null;
+}
+
+final moveAnimationEventProvider =
+    NotifierProvider<MoveAnimationEventNotifier, MoveAnimationEvent?>(
+        MoveAnimationEventNotifier.new);
+
 // ── Pawn promotion ──────────────────────────────────────────────────────────
 
 /// Tracks a pending pawn promotion awaiting user input.
@@ -501,11 +538,43 @@ class GameNotifier extends Notifier<GameState> {
   }
 
   Future<void> _makeMove(Move move) async {
+    // Capture pre-move info for animation.
+    final movingPiece = state.board.getPiece(move.from);
+    final capturedPiece = move.isCapture ? state.board.getPiece(move.to) : null;
+
+    // Detect castling rook movement.
+    Position? rookFrom;
+    Position? rookTo;
+    Piece? rookPiece;
+    if (move.isCastling && movingPiece != null) {
+      final row = move.from.row;
+      if (move.to.col > move.from.col) {
+        // Kingside
+        rookFrom = Position(row, state.board.size - 1);
+        rookTo = Position(row, move.to.col - 1);
+      } else {
+        // Queenside
+        rookFrom = Position(row, 0);
+        rookTo = Position(row, move.to.col + 1);
+      }
+      rookPiece = state.board.getPiece(rookFrom);
+    }
+
     final newState = state.copy();
     if (newState.makeMove(move)) {
       state = newState;
       _selectedPosition = null;
       _selectedPieceMoves = [];
+
+      // Animate the piece sliding to its destination.
+      if (movingPiece != null) {
+        await _animateMove(
+          move.from, move.to, movingPiece, capturedPiece,
+          secondaryFrom: rookFrom,
+          secondaryTo: rookTo,
+          secondaryPiece: rookPiece,
+        );
+      }
 
       // Handle atomic explosion animation (awaited before AI moves).
       await _handleAtomicExplosion();
@@ -533,6 +602,29 @@ class GameNotifier extends Notifier<GameState> {
         _makeAIMove();
       }
     }
+  }
+
+  /// Triggers the move animation overlay and waits for it to complete (200 ms).
+  Future<void> _animateMove(
+    Position from,
+    Position to,
+    Piece piece,
+    Piece? capturedPiece, {
+    Position? secondaryFrom,
+    Position? secondaryTo,
+    Piece? secondaryPiece,
+  }) async {
+    ref.read(moveAnimationEventProvider.notifier).trigger(MoveAnimationEvent(
+      from: from,
+      to: to,
+      piece: piece,
+      capturedPiece: capturedPiece,
+      secondaryFrom: secondaryFrom,
+      secondaryTo: secondaryTo,
+      secondaryPiece: secondaryPiece,
+    ));
+    await Future.delayed(const Duration(milliseconds: 220));
+    ref.read(moveAnimationEventProvider.notifier).clear();
   }
 
   /// Detects if the last move triggered an atomic explosion, updates the crater
@@ -686,9 +778,35 @@ class GameNotifier extends Notifier<GameState> {
       final piece = state.board.getPiece(move.from);
       final capturedPiece = state.board.getPiece(move.to);
 
+      // Detect castling rook movement for AI.
+      Position? rookFrom;
+      Position? rookTo;
+      Piece? rookPiece;
+      if (move.isCastling && piece != null) {
+        final row = move.from.row;
+        if (move.to.col > move.from.col) {
+          rookFrom = Position(row, state.board.size - 1);
+          rookTo = Position(row, move.to.col - 1);
+        } else {
+          rookFrom = Position(row, 0);
+          rookTo = Position(row, move.to.col + 1);
+        }
+        rookPiece = state.board.getPiece(rookFrom);
+      }
+
       final newState = state.copy();
       newState.makeMove(move);
       state = newState;
+
+      // Animate the AI's piece sliding to its destination.
+      if (piece != null) {
+        await _animateMove(
+          move.from, move.to, piece, move.isCapture ? capturedPiece : null,
+          secondaryFrom: rookFrom,
+          secondaryTo: rookTo,
+          secondaryPiece: rookPiece,
+        );
+      }
 
       // Show explosion animation when AI triggers an atomic capture.
       await _handleAtomicExplosion();
