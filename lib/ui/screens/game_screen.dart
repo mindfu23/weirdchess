@@ -256,14 +256,13 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                   .overlay!
                   .context
                   .findRenderObject() as RenderBox;
-              final buttonRect = Rect.fromPoints(
-                button.localToGlobal(Offset.zero, ancestor: overlay),
-                button.localToGlobal(button.size.bottomRight(Offset.zero),
-                    ancestor: overlay),
-              );
-              final position = RelativeRect.fromSize(
-                buttonRect,
-                overlay.size,
+              final buttonPos =
+                  button.localToGlobal(Offset.zero, ancestor: overlay);
+              final position = RelativeRect.fromLTRB(
+                buttonPos.dx,
+                buttonPos.dy + button.size.height,
+                overlay.size.width - buttonPos.dx - button.size.width,
+                0,
               );
               // Defer past the touch-up event cycle.
               WidgetsBinding.instance.addPostFrameCallback((_) {
