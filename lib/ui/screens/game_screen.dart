@@ -20,6 +20,18 @@ class GameScreen extends ConsumerStatefulWidget {
 
 class _GameScreenState extends ConsumerState<GameScreen> {
   final _difficultyKey = GlobalKey();
+  OverlayEntry? _difficultyOverlay;
+
+  void _removeDifficultyOverlay() {
+    _difficultyOverlay?.remove();
+    _difficultyOverlay = null;
+  }
+
+  @override
+  void dispose() {
+    _removeDifficultyOverlay();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -348,85 +360,83 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
   void _showDifficultyDropdown(BuildContext context, AIDifficulty current) {
+    // If already showing, toggle off.
+    if (_difficultyOverlay != null) {
+      _removeDifficultyOverlay();
+      return;
+    }
+
     final RenderBox button =
         _difficultyKey.currentContext!.findRenderObject() as RenderBox;
     final buttonPos = button.localToGlobal(Offset.zero);
     final buttonSize = button.size;
+    final screenWidth = MediaQuery.of(context).size.width;
 
-    showGeneralDialog<AIDifficulty>(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.transparent,
-      pageBuilder: (ctx, anim1, anim2) {
-        return Stack(
-          children: [
-            // Invisible full-screen target to dismiss on a new touch-down.
-            // Using Listener.onPointerDown instead of GestureDetector.onTap
-            // so that residual touch-up events from the icon button can't
-            // accidentally close the dropdown.
-            Positioned.fill(
-              child: Listener(
-                onPointerDown: (_) => Navigator.pop(ctx),
-                behavior: HitTestBehavior.opaque,
-                child: const SizedBox.expand(),
-              ),
+    _difficultyOverlay = OverlayEntry(
+      builder: (overlayContext) => Stack(
+        children: [
+          // Full-screen dismiss target.
+          Positioned.fill(
+            child: GestureDetector(
+              onTap: _removeDifficultyOverlay,
+              behavior: HitTestBehavior.opaque,
+              child: const SizedBox.expand(),
             ),
-            // Dropdown menu positioned directly below the icon.
-            Positioned(
-              top: buttonPos.dy + buttonSize.height,
-              right: MediaQuery.of(context).size.width -
-                  buttonPos.dx -
-                  buttonSize.width,
-              child: Material(
-                elevation: 8,
-                borderRadius: BorderRadius.circular(8),
-                color: const Color(0xFF2D3542),
-                child: IntrinsicWidth(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: AIDifficulty.values.map((level) {
-                      final label = level.name[0].toUpperCase() +
-                          level.name.substring(1);
-                      return InkWell(
-                        borderRadius: BorderRadius.circular(4),
-                        onTap: () => Navigator.pop(ctx, level),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (level == current)
-                                const Icon(Icons.check,
-                                    color: Color(0xFFF5E6D3), size: 18)
-                              else
-                                const SizedBox(width: 18),
-                              const SizedBox(width: 8),
-                              Text(
-                                label,
-                                style: const TextStyle(
-                                  color: Color(0xFFF5E6D3),
-                                  fontSize: 14,
-                                ),
+          ),
+          // Dropdown positioned below the icon, right-aligned.
+          Positioned(
+            top: buttonPos.dy + buttonSize.height,
+            right: screenWidth - buttonPos.dx - buttonSize.width,
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(8),
+              color: const Color(0xFF2D3542),
+              child: IntrinsicWidth(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: AIDifficulty.values.map((level) {
+                    final label = level.name[0].toUpperCase() +
+                        level.name.substring(1);
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(4),
+                      onTap: () {
+                        _removeDifficultyOverlay();
+                        ref.read(aiDifficultyProvider.notifier).set(level);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 12),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (level == current)
+                              const Icon(Icons.check,
+                                  color: Color(0xFFF5E6D3), size: 18)
+                            else
+                              const SizedBox(width: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              label,
+                              style: const TextStyle(
+                                color: Color(0xFFF5E6D3),
+                                fontSize: 14,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                      );
-                    }).toList(),
-                  ),
+                      ),
+                    );
+                  }).toList(),
                 ),
               ),
             ),
-          ],
-        );
-      },
-    ).then((value) {
-      if (value != null) {
-        ref.read(aiDifficultyProvider.notifier).set(value);
-      }
-    });
+          ),
+        ],
+      ),
+    );
+
+    Overlay.of(context).insert(_difficultyOverlay!);
   }
 
   void _showRulesDialog(BuildContext context, variant) {
