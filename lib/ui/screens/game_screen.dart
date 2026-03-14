@@ -373,7 +373,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     _difficultyOverlay = OverlayEntry(
-      builder: (overlayContext) => Positioned(
+      builder: (overlayContext) => Stack(
+        children: [
+          // Full-screen dismiss — delayed so the opening tap can't trigger it.
+          _DelayedTapDismiss(onDismiss: _removeDifficultyOverlay),
+          Positioned(
         top: buttonPos.dy + buttonSize.height,
         right: screenWidth - buttonPos.dx - buttonSize.width,
         child: Material(
@@ -420,6 +424,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             ),
           ),
         ),
+      ),
+        ],
       ),
     );
 
@@ -484,6 +490,43 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             child: const Text('Close'),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Full-screen tap target that ignores all pointer events for the first 300 ms
+/// after mounting, then starts listening. This prevents the tap that opened the
+/// dropdown from immediately dismissing it on iPad.
+class _DelayedTapDismiss extends StatefulWidget {
+  final VoidCallback onDismiss;
+  const _DelayedTapDismiss({required this.onDismiss});
+
+  @override
+  State<_DelayedTapDismiss> createState() => _DelayedTapDismissState();
+}
+
+class _DelayedTapDismissState extends State<_DelayedTapDismiss> {
+  bool _active = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _active = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: !_active,
+        child: GestureDetector(
+          onTap: widget.onDismiss,
+          behavior: HitTestBehavior.opaque,
+          child: const SizedBox.expand(),
+        ),
       ),
     );
   }
