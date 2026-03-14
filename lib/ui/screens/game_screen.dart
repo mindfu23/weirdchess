@@ -436,7 +436,13 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       ),
     );
 
-    Overlay.of(context).insert(_difficultyOverlay!);
+    // Defer insertion to the next frame so the icon button's tap event
+    // has fully completed and can't propagate into the overlay's dismiss area.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _difficultyOverlay != null) {
+        Overlay.of(context).insert(_difficultyOverlay!);
+      }
+    });
   }
 
   void _showRulesDialog(BuildContext context, variant) {
