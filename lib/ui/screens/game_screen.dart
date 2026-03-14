@@ -373,76 +373,57 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     final screenWidth = MediaQuery.of(context).size.width;
 
     _difficultyOverlay = OverlayEntry(
-      builder: (overlayContext) => Stack(
-        children: [
-          // Full-screen dismiss target.
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: _removeDifficultyOverlay,
-              behavior: HitTestBehavior.opaque,
-              child: const SizedBox.expand(),
-            ),
-          ),
-          // Dropdown positioned below the icon, right-aligned.
-          Positioned(
-            top: buttonPos.dy + buttonSize.height,
-            right: screenWidth - buttonPos.dx - buttonSize.width,
-            child: Material(
-              elevation: 8,
-              borderRadius: BorderRadius.circular(8),
-              color: const Color(0xFF2D3542),
-              child: IntrinsicWidth(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: AIDifficulty.values.map((level) {
-                    final label = level.name[0].toUpperCase() +
-                        level.name.substring(1);
-                    return InkWell(
-                      borderRadius: BorderRadius.circular(4),
-                      onTap: () {
-                        _removeDifficultyOverlay();
-                        ref.read(aiDifficultyProvider.notifier).set(level);
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (level == current)
-                              const Icon(Icons.check,
-                                  color: Color(0xFFF5E6D3), size: 18)
-                            else
-                              const SizedBox(width: 18),
-                            const SizedBox(width: 8),
-                            Text(
-                              label,
-                              style: const TextStyle(
-                                color: Color(0xFFF5E6D3),
-                                fontSize: 14,
-                              ),
-                            ),
-                          ],
+      builder: (overlayContext) => Positioned(
+        top: buttonPos.dy + buttonSize.height,
+        right: screenWidth - buttonPos.dx - buttonSize.width,
+        child: Material(
+          elevation: 8,
+          borderRadius: BorderRadius.circular(8),
+          color: const Color(0xFF2D3542),
+          child: IntrinsicWidth(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: AIDifficulty.values.map((level) {
+                final label =
+                    level.name[0].toUpperCase() + level.name.substring(1);
+                return InkWell(
+                  borderRadius: BorderRadius.circular(4),
+                  onTap: () {
+                    _removeDifficultyOverlay();
+                    ref.read(aiDifficultyProvider.notifier).set(level);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (level == current)
+                          const Icon(Icons.check,
+                              color: Color(0xFFF5E6D3), size: 18)
+                        else
+                          const SizedBox(width: 18),
+                        const SizedBox(width: 8),
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            color: Color(0xFFF5E6D3),
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
           ),
-        ],
+        ),
       ),
     );
 
-    // Defer insertion to the next frame so the icon button's tap event
-    // has fully completed and can't propagate into the overlay's dismiss area.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && _difficultyOverlay != null) {
-        Overlay.of(context).insert(_difficultyOverlay!);
-      }
-    });
+    Overlay.of(context).insert(_difficultyOverlay!);
   }
 
   void _showRulesDialog(BuildContext context, variant) {
