@@ -78,6 +78,7 @@ flutter:
   assets:
     - assets/config.json
     - assets/images/
+    - assets/pieces/standard/
 
   fonts:
     - family: Righteous

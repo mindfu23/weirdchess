@@ -1,16 +1,66 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/piece.dart';
 
-/// Widget that displays a chess piece as a simple circle with letter
+/// Maps single-letter piece symbols to CBurnett SVG filenames.
+/// Compound and Jetan pieces (multi-letter symbols) fall back to circle+letter.
+const _svgPieceFiles = {
+  'K': 'king',
+  'Q': 'queen',
+  'R': 'rook',
+  'B': 'bishop',
+  'N': 'knight',
+  'P': 'pawn',
+};
+
+/// Returns the asset path for a piece's SVG, or null if no SVG exists.
+String? _svgAssetPath(Piece piece, {String set = 'standard'}) {
+  final pieceName = _svgPieceFiles[piece.symbol];
+  if (pieceName == null) return null;
+  final colorPrefix = piece.color == PieceColor.white ? 'w' : 'b';
+  return 'assets/pieces/$set/$colorPrefix${piece.symbol}.svg';
+}
+
+/// Widget that displays a chess piece — SVG when available, circle+letter fallback.
 class PieceWidget extends StatelessWidget {
   final Piece piece;
   final double size;
+  final String pieceSet;
 
   const PieceWidget({
     super.key,
     required this.piece,
     this.size = 40,
+    this.pieceSet = 'standard',
   });
+
+  @override
+  Widget build(BuildContext context) {
+    final svgPath = _svgAssetPath(piece, set: pieceSet);
+
+    if (svgPath != null) {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: SvgPicture.asset(
+          svgPath,
+          width: size,
+          height: size,
+        ),
+      );
+    }
+
+    // Fallback: circle + letter for pieces without SVGs
+    return _CircleLetterPiece(piece: piece, size: size);
+  }
+}
+
+/// Original circle+letter rendering, used as fallback for compound/Jetan pieces.
+class _CircleLetterPiece extends StatelessWidget {
+  final Piece piece;
+  final double size;
+
+  const _CircleLetterPiece({required this.piece, required this.size});
 
   @override
   Widget build(BuildContext context) {
