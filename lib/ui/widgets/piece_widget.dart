@@ -1,27 +1,43 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/piece.dart';
 
-/// Maps single-letter piece symbols to CBurnett SVG filenames.
-/// Compound and Jetan pieces (multi-letter symbols) fall back to circle+letter.
-const _svgPieceFiles = {
-  'K': 'king',
-  'Q': 'queen',
-  'R': 'rook',
-  'B': 'bishop',
-  'N': 'knight',
-  'P': 'pawn',
-};
+/// Standard piece symbols that have dedicated asset files.
+const _standardSymbols = {'K', 'Q', 'R', 'B', 'N', 'P'};
 
-/// Returns the asset path for a piece's SVG, or null if no SVG exists.
-String? _svgAssetPath(Piece piece, {String set = 'standard'}) {
-  final pieceName = _svgPieceFiles[piece.symbol];
-  if (pieceName == null) return null;
+/// Returns the asset path for a piece, trying SVG first then PNG.
+/// Returns null for compound/Jetan pieces (multi-letter symbols).
+String? _pieceAssetPath(Piece piece, {String set = 'standard'}) {
+  if (!_standardSymbols.contains(piece.symbol)) return null;
   final colorPrefix = piece.color == PieceColor.white ? 'w' : 'b';
-  return 'assets/pieces/$set/$colorPrefix${piece.symbol}.svg';
+  final base = 'assets/pieces/$set/$colorPrefix${piece.symbol}';
+  return base; // caller will try .svg then .png
 }
 
-/// Widget that displays a chess piece — SVG when available, circle+letter fallback.
+/// Cache which asset paths exist and in which format.
+final Map<String, String?> _assetFormatCache = {};
+
+/// Check if an asset exists, with caching.
+Future<String?> _resolveAssetFormat(String basePath) async {
+  if (_assetFormatCache.containsKey(basePath)) {
+    return _assetFormatCache[basePath];
+  }
+  // Try SVG first, then PNG
+  for (final ext in ['.svg', '.png']) {
+    try {
+      await rootBundle.load('$basePath$ext');
+      _assetFormatCache[basePath] = '$basePath$ext';
+      return '$basePath$ext';
+    } catch (_) {
+      // Asset doesn't exist in this format
+    }
+  }
+  _assetFormatCache[basePath] = null;
+  return null;
+}
+
+/// Widget that displays a chess piece — SVG or PNG when available, circle+letter fallback.
 class PieceWidget extends StatelessWidget {
   final Piece piece;
   final double size;
@@ -36,22 +52,40 @@ class PieceWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final svgPath = _svgAssetPath(piece, set: pieceSet);
+    final basePath = _pieceAssetPath(piece, set: pieceSet);
 
-    if (svgPath != null) {
-      return SizedBox(
-        width: size,
-        height: size,
-        child: SvgPicture.asset(
-          svgPath,
-          width: size,
-          height: size,
-        ),
-      );
+    if (basePath == null) {
+      return _CircleLetterPiece(piece: piece, size: size);
     }
 
-    // Fallback: circle + letter for pieces without SVGs
-    return _CircleLetterPiece(piece: piece, size: size);
+    return FutureBuilder<String?>(
+      future: _resolveAssetFormat(basePath),
+      builder: (context, snapshot) {
+        final resolvedPath = snapshot.data;
+
+        if (resolvedPath == null) {
+          if (snapshot.connectionState == ConnectionState.done) {
+            return _CircleLetterPiece(piece: piece, size: size);
+          }
+          // Still loading — show empty box to avoid flicker
+          return SizedBox(width: size, height: size);
+        }
+
+        if (resolvedPath.endsWith('.svg')) {
+          return SizedBox(
+            width: size,
+            height: size,
+            child: SvgPicture.asset(resolvedPath, width: size, height: size),
+          );
+        } else {
+          return SizedBox(
+            width: size,
+            height: size,
+            child: Image.asset(resolvedPath, width: size, height: size, fit: BoxFit.contain),
+          );
+        }
+      },
+    );
   }
 }
 

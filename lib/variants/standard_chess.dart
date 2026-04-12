@@ -26,6 +26,9 @@ class StandardChess extends ChessVariant {
   Color get darkSquareColor => const Color(0xFFB58863);
 
   @override
+  String get pieceSet => 'weird'; // TODO: revert to 'standard' or make user-selectable
+
+  @override
   String get rulesUrl => 'https://www.chess.com/learn-how-to-play-chess';
 
   @override

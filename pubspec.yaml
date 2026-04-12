@@ -79,6 +79,7 @@ flutter:
     - assets/config.json
     - assets/images/
     - assets/pieces/standard/
+    - assets/pieces/weird/
 
   fonts:
     - family: Righteous
