@@ -30,6 +30,10 @@ abstract class ChessVariant implements ChessVariantInterface {
   /// URL to full rules
   String get rulesUrl;
 
+  /// Piece set directory name (under assets/pieces/).
+  /// Defaults to 'standard'; override per variant for custom piece art.
+  String get pieceSet => 'standard';
+
   /// Create initial board setup
   Board createInitialBoard();
 

@@ -11,8 +11,9 @@ import 'piece_widget.dart';
 /// user only sees the sliding copy.
 class MoveAnimationOverlay extends ConsumerWidget {
   final int boardSize;
+  final String pieceSet;
 
-  const MoveAnimationOverlay({super.key, required this.boardSize});
+  const MoveAnimationOverlay({super.key, required this.boardSize, this.pieceSet = 'standard'});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,6 +28,7 @@ class MoveAnimationOverlay extends ConsumerWidget {
       event: event,
       boardSize: boardSize,
       isFlipped: isFlipped,
+      pieceSet: pieceSet,
     );
   }
 }
@@ -35,12 +37,14 @@ class _AnimatedPieceSlide extends StatefulWidget {
   final MoveAnimationEvent event;
   final int boardSize;
   final bool isFlipped;
+  final String pieceSet;
 
   const _AnimatedPieceSlide({
     super.key,
     required this.event,
     required this.boardSize,
     required this.isFlipped,
+    this.pieceSet = 'standard',
   });
 
   @override
@@ -144,7 +148,7 @@ class _AnimatedPieceSlideState extends State<_AnimatedPieceSlide>
                 top: current.dy * constraints.maxHeight + offset,
                 width: pieceSize,
                 height: pieceSize,
-                child: PieceWidget(piece: piece, size: pieceSize),
+                child: PieceWidget(piece: piece, size: pieceSize, pieceSet: widget.pieceSet),
               ),
             ],
           );
@@ -177,7 +181,7 @@ class _AnimatedPieceSlideState extends State<_AnimatedPieceSlide>
                 height: pieceSize,
                 child: Opacity(
                   opacity: 1.0 - t,
-                  child: PieceWidget(piece: piece, size: pieceSize),
+                  child: PieceWidget(piece: piece, size: pieceSize, pieceSet: widget.pieceSet),
                 ),
               ),
             ],

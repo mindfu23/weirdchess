@@ -49,13 +49,14 @@ class BoardWidget extends ConsumerWidget {
                   position: position,
                   lightColor: variant.lightSquareColor,
                   darkColor: variant.darkSquareColor,
+                  pieceSet: variant.pieceSet,
                 );
               },
             ),
             // Piece move animation overlay (slide + capture fade).
             Positioned.fill(
               child: IgnorePointer(
-                child: MoveAnimationOverlay(boardSize: boardSize),
+                child: MoveAnimationOverlay(boardSize: boardSize, pieceSet: variant.pieceSet),
               ),
             ),
             // Atomic explosion animation — only active for Atomic Chess.
@@ -76,11 +77,13 @@ class _SquareWidget extends ConsumerWidget {
   final Position position;
   final Color lightColor;
   final Color darkColor;
+  final String pieceSet;
 
   const _SquareWidget({
     required this.position,
     required this.lightColor,
     required this.darkColor,
+    this.pieceSet = 'standard',
   });
 
   @override
@@ -197,7 +200,7 @@ class _SquareWidget extends ConsumerWidget {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final pieceSize = constraints.maxWidth * 0.8;
-                    return PieceWidget(piece: piece!, size: pieceSize);
+                    return PieceWidget(piece: piece!, size: pieceSize, pieceSet: pieceSet);
                   },
                 ),
               ),
