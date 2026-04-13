@@ -1,3 +1,4 @@
+import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_svg/flutter_svg.dart';
@@ -6,28 +7,26 @@ import '../../core/piece.dart';
 /// Standard piece symbols that have dedicated asset files.
 const _standardSymbols = {'K', 'Q', 'R', 'B', 'N', 'P'};
 
-/// Compound piece symbols (10x10 variants).
-const _compoundSymbols = {'M', 'C', 'A', 'Ch', 'W', 'Fa', 'Hu'};
-
-/// Jetan (Barsoomian) piece symbols.
-const _jetanSymbols = {'Cf', 'Pr', 'Fl', 'Dw', 'Pd', 'Wa', 'Th', 'Pa'};
+/// Jetan pieces that map to standard equivalents for display.
+/// Pieces with no clear unique mapping (Pd, Wa) use circle+letter.
+/// Custom Jetan/compound art saved in assets/pieces/jetan/ and compound/ for future use.
+const _jetanToStandard = {
+  'Cf': 'K',  // Chief → King (leader, capture = loss)
+  'Pr': 'Q',  // Princess → Queen (royal)
+  'Fl': 'B',  // Flier → Bishop (diagonal)
+  'Dw': 'R',  // Dwar → Rook (orthogonal)
+  'Th': 'N',  // Thoat → Knight (has knight leap)
+  'Pa': 'P',  // Panthan → Pawn (foot soldier)
+};
 
 /// Returns the asset path for a piece, trying SVG first then PNG.
-/// Routes standard pieces to set dir, compound/Jetan to their own dirs.
+/// Maps Jetan pieces to standard equivalents where possible.
 String? _pieceAssetPath(Piece piece, {String set = 'standard'}) {
+  final sym = _jetanToStandard[piece.symbol] ?? piece.symbol;
+  if (!_standardSymbols.contains(sym)) return null;
   final colorPrefix = piece.color == PieceColor.white ? 'w' : 'b';
-  final sym = piece.symbol;
-
-  if (_standardSymbols.contains(sym)) {
-    return 'assets/pieces/$set/$colorPrefix$sym';
-  }
-  if (_compoundSymbols.contains(sym)) {
-    return 'assets/pieces/compound/$colorPrefix$sym';
-  }
-  if (_jetanSymbols.contains(sym)) {
-    return 'assets/pieces/jetan/$colorPrefix$sym';
-  }
-  return null; // unknown symbol — fallback to circle+letter
+  final base = 'assets/pieces/$set/$colorPrefix$sym';
+  return base; // caller will try .svg then .png
 }
 
 /// Cache which asset paths exist and in which format.
@@ -86,19 +85,39 @@ class PieceWidget extends StatelessWidget {
           return SizedBox(width: size, height: size);
         }
 
+        final Widget pieceImage;
         if (resolvedPath.endsWith('.svg')) {
-          return SizedBox(
-            width: size,
-            height: size,
-            child: SvgPicture.asset(resolvedPath, width: size, height: size),
-          );
+          pieceImage = SvgPicture.asset(resolvedPath, width: size, height: size);
         } else {
+          pieceImage = Image.asset(resolvedPath, width: size, height: size, fit: BoxFit.contain);
+        }
+
+        // Black pieces get a white outline that follows the piece silhouette
+        if (piece.color == PieceColor.black) {
           return SizedBox(
             width: size,
             height: size,
-            child: Image.asset(resolvedPath, width: size, height: size, fit: BoxFit.contain),
+            child: Stack(
+              children: [
+                // White blurred copy behind = silhouette outline
+                ImageFiltered(
+                  imageFilter: ColorFilter.mode(
+                    Colors.white.withAlpha(220),
+                    BlendMode.srcATop,
+                  ),
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+                    child: pieceImage,
+                  ),
+                ),
+                // Original piece on top
+                pieceImage,
+              ],
+            ),
           );
         }
+
+        return SizedBox(width: size, height: size, child: pieceImage);
       },
     );
   }
