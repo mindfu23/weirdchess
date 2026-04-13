@@ -22,7 +22,7 @@ const _jetanToStandard = {
 const _jetanCustomSymbols = {'Wa', 'Pd'};
 
 /// Compound pieces with custom art in assets/pieces/compound/.
-const _compoundCustomSymbols = {'Ch', 'W'};
+const _compoundCustomSymbols = {'Ch', 'W', 'Fa', 'Hu'};
 
 /// Returns the asset path for a piece, trying SVG first then PNG.
 /// Maps Jetan pieces to standard equivalents, or custom jetan/ art.
