@@ -21,6 +21,9 @@ const _jetanToStandard = {
 /// Jetan pieces with custom art in assets/pieces/jetan/.
 const _jetanCustomSymbols = {'Wa', 'Pd'};
 
+/// Compound pieces with custom art in assets/pieces/compound/.
+const _compoundCustomSymbols = {'Ch', 'W'};
+
 /// Returns the asset path for a piece, trying SVG first then PNG.
 /// Maps Jetan pieces to standard equivalents, or custom jetan/ art.
 String? _pieceAssetPath(Piece piece, {String set = 'standard'}) {
@@ -30,6 +33,11 @@ String? _pieceAssetPath(Piece piece, {String set = 'standard'}) {
   // Custom Jetan art (Warrior, Padwar)
   if (_jetanCustomSymbols.contains(sym)) {
     return 'assets/pieces/jetan/$colorPrefix$sym';
+  }
+
+  // Custom compound art (Champion)
+  if (_compoundCustomSymbols.contains(sym)) {
+    return 'assets/pieces/compound/$colorPrefix$sym';
   }
 
   // Map other Jetan pieces to standard equivalents
