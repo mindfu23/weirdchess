@@ -6,13 +6,28 @@ import '../../core/piece.dart';
 /// Standard piece symbols that have dedicated asset files.
 const _standardSymbols = {'K', 'Q', 'R', 'B', 'N', 'P'};
 
+/// Compound piece symbols (10x10 variants).
+const _compoundSymbols = {'M', 'C', 'A', 'Ch', 'W', 'Fa', 'Hu'};
+
+/// Jetan (Barsoomian) piece symbols.
+const _jetanSymbols = {'Cf', 'Pr', 'Fl', 'Dw', 'Pd', 'Wa', 'Th', 'Pa'};
+
 /// Returns the asset path for a piece, trying SVG first then PNG.
-/// Returns null for compound/Jetan pieces (multi-letter symbols).
+/// Routes standard pieces to set dir, compound/Jetan to their own dirs.
 String? _pieceAssetPath(Piece piece, {String set = 'standard'}) {
-  if (!_standardSymbols.contains(piece.symbol)) return null;
   final colorPrefix = piece.color == PieceColor.white ? 'w' : 'b';
-  final base = 'assets/pieces/$set/$colorPrefix${piece.symbol}';
-  return base; // caller will try .svg then .png
+  final sym = piece.symbol;
+
+  if (_standardSymbols.contains(sym)) {
+    return 'assets/pieces/$set/$colorPrefix$sym';
+  }
+  if (_compoundSymbols.contains(sym)) {
+    return 'assets/pieces/compound/$colorPrefix$sym';
+  }
+  if (_jetanSymbols.contains(sym)) {
+    return 'assets/pieces/jetan/$colorPrefix$sym';
+  }
+  return null; // unknown symbol — fallback to circle+letter
 }
 
 /// Cache which asset paths exist and in which format.
