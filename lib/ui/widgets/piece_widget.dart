@@ -8,7 +8,6 @@ import '../../core/piece.dart';
 const _standardSymbols = {'K', 'Q', 'R', 'B', 'N', 'P'};
 
 /// Jetan pieces that map to standard equivalents for display.
-/// Pieces with no clear unique mapping (Pd, Wa) use circle+letter.
 /// Custom Jetan/compound art saved in assets/pieces/jetan/ and compound/ for future use.
 const _jetanToStandard = {
   'Cf': 'K',  // Chief → King (leader, capture = loss)
@@ -19,13 +18,24 @@ const _jetanToStandard = {
   'Pa': 'P',  // Panthan → Pawn (foot soldier)
 };
 
+/// Jetan pieces with custom art in assets/pieces/jetan/.
+const _jetanCustomSymbols = {'Wa', 'Pd'};
+
 /// Returns the asset path for a piece, trying SVG first then PNG.
-/// Maps Jetan pieces to standard equivalents where possible.
+/// Maps Jetan pieces to standard equivalents, or custom jetan/ art.
 String? _pieceAssetPath(Piece piece, {String set = 'standard'}) {
-  final sym = _jetanToStandard[piece.symbol] ?? piece.symbol;
-  if (!_standardSymbols.contains(sym)) return null;
   final colorPrefix = piece.color == PieceColor.white ? 'w' : 'b';
-  final base = 'assets/pieces/$set/$colorPrefix$sym';
+  final sym = piece.symbol;
+
+  // Custom Jetan art (Warrior, Padwar)
+  if (_jetanCustomSymbols.contains(sym)) {
+    return 'assets/pieces/jetan/$colorPrefix$sym';
+  }
+
+  // Map other Jetan pieces to standard equivalents
+  final mapped = _jetanToStandard[sym] ?? sym;
+  if (!_standardSymbols.contains(mapped)) return null;
+  final base = 'assets/pieces/$set/$colorPrefix$mapped';
   return base; // caller will try .svg then .png
 }
 
