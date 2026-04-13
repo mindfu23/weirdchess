@@ -99,17 +99,19 @@ class PieceWidget extends StatelessWidget {
             height: size,
             child: Stack(
               children: [
-                // White blurred copy behind = silhouette outline
-                ImageFiltered(
-                  imageFilter: ColorFilter.mode(
-                    Colors.white.withAlpha(220),
-                    BlendMode.srcATop,
+                // White blurred copies behind = silhouette outline
+                // Stacked twice for a more solid edge
+                for (final _ in [0, 1])
+                  ImageFiltered(
+                    imageFilter: ColorFilter.mode(
+                      Colors.white,
+                      BlendMode.srcATop,
+                    ),
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+                      child: pieceImage,
+                    ),
                   ),
-                  child: ImageFiltered(
-                    imageFilter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
-                    child: pieceImage,
-                  ),
-                ),
                 // Original piece on top
                 pieceImage,
               ],
