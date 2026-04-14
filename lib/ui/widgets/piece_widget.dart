@@ -22,7 +22,16 @@ const _jetanToStandard = {
 const _jetanCustomSymbols = {'Wa', 'Pd'};
 
 /// Compound pieces with custom art in assets/pieces/compound/.
-const _compoundCustomSymbols = {'Ch', 'W', 'Fa', 'Hu'};
+const _compoundCustomSymbols = {'Ch', 'W', 'Fa', 'Hu', 'M', 'C'};
+
+/// Compound pieces that always show custom art (even on 'classic' variants).
+const _alwaysCustomSymbols = {'A'};
+
+/// Hyderabad-specific piece art (classic set): symbol → filename suffix.
+const _classicCustom = {
+  'M': 'M_hyderabad',  // Dabbaba → elephant
+  'C': 'C_hyderabad',  // Wazir → katar/punch dagger
+};
 
 /// Returns the asset path for a piece, trying SVG first then PNG.
 /// Maps Jetan pieces to standard equivalents, or custom jetan/ art.
@@ -35,15 +44,27 @@ String? _pieceAssetPath(Piece piece, {String set = 'standard'}) {
     return 'assets/pieces/jetan/$colorPrefix$sym';
   }
 
-  // Custom compound art (Champion)
-  if (_compoundCustomSymbols.contains(sym)) {
+  // Pieces that always use custom art (Zurafa/Amazon)
+  if (_alwaysCustomSymbols.contains(sym)) {
+    return 'assets/pieces/compound/$colorPrefix$sym';
+  }
+
+  // Hyderabad-specific custom art (classic set)
+  if (set == 'classic' && _classicCustom.containsKey(sym)) {
+    return 'assets/pieces/compound/$colorPrefix${_classicCustom[sym]}';
+  }
+
+  // Custom compound art — only for variants that opt in (not 'classic')
+  if (set != 'classic' && _compoundCustomSymbols.contains(sym)) {
     return 'assets/pieces/compound/$colorPrefix$sym';
   }
 
   // Map other Jetan pieces to standard equivalents
   final mapped = _jetanToStandard[sym] ?? sym;
   if (!_standardSymbols.contains(mapped)) return null;
-  final base = 'assets/pieces/$set/$colorPrefix$mapped';
+  // 'classic' resolves to the 'standard' asset directory
+  final dir = set == 'classic' ? 'standard' : set;
+  final base = 'assets/pieces/$dir/$colorPrefix$mapped';
   return base; // caller will try .svg then .png
 }
 

@@ -28,6 +28,9 @@ class HyderabadChess extends ChessVariant {
   Color get darkSquareColor => const Color(0xFF8B4513); // Saddle brown
 
   @override
+  String get pieceSet => 'classic'; // Use standard piece art, no custom compound icons
+
+  @override
   String get rulesUrl => 'https://www.chessvariants.com/historic.dir/indiangr.html';
 
   @override
