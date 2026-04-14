@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/board.dart';
 import '../../core/game_state.dart';
+import '../../core/move.dart';
 import '../../core/piece.dart';
 import '../../services/game_service.dart';
 import '../../variants/three_check.dart';
 import '../../variants/variant_base.dart';
 import 'piece_info_panel.dart';
+import 'piece_widget.dart';
 
 // ── Brand palette (mirrors home_screen / main.dart theme) ──────────────────
 const _kBackground = Color(0xFF1A1A1A);
@@ -269,15 +272,15 @@ class ScorePanel extends ConsumerWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        width: 28,
-                        child: Text(
-                          info.symbol,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: _kTextPrimary,
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8, top: 2),
+                        child: PieceWidget(
+                          piece: _DisplayPiece(
+                            symbol: e.key, // Use map key (actual piece symbol), not display symbol
+                            color: PieceColor.white,
                           ),
+                          size: 24,
+                          pieceSet: variant.pieceSet,
                         ),
                       ),
                       Expanded(
@@ -528,4 +531,16 @@ class ScorePanel extends ConsumerWidget {
       ],
     );
   }
+}
+
+/// Lightweight Piece subclass for display-only purposes (piece guide thumbnails).
+class _DisplayPiece extends Piece {
+  _DisplayPiece({required super.symbol, required super.color})
+      : super(name: '', value: 0);
+
+  @override
+  List<Move> getPseudoLegalMoves(Board board, Position position) => [];
+
+  @override
+  Piece copy() => _DisplayPiece(symbol: symbol, color: color);
 }
