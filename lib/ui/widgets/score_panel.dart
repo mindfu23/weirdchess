@@ -27,89 +27,101 @@ class ScorePanel extends ConsumerWidget {
     final notifier = ref.watch(gameNotifierProvider.notifier);
     final variant = ref.watch(selectedVariantProvider);
 
+    // Fixed-at-top: turn indicator, check counter, full piece guide.
+    final topChildren = <Widget>[
+      _buildTurnIndicator(gameState, notifier.isAIThinking),
+      const SizedBox(height: 12),
+      if (variant.id == 'three_check') ...[
+        _buildCheckCounter(gameState),
+        const SizedBox(height: 12),
+      ],
+      if (variant.boardSize == 10) ...[
+        _buildPieceGuide(variant),
+        const SizedBox(height: 12),
+      ],
+    ];
+
+    // Scrollable-if-overflow: everything below the piece guide.
+    final bottomChildren = <Widget>[
+      if (gameState.isGameOver) ...[
+        _buildGameResult(gameState),
+        const SizedBox(height: 12),
+      ],
+      _buildCapturedPieces(gameState),
+      const SizedBox(height: 12),
+      Text(
+        'Move ${gameState.fullMoveNumber}',
+        style: const TextStyle(fontSize: 14, color: _kTextMuted),
+        textAlign: TextAlign.center,
+      ),
+      const SizedBox(height: 12),
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          ElevatedButton.icon(
+            onPressed:
+                gameState.moveHistory.isEmpty ? null : notifier.undoMove,
+            icon: const Icon(Icons.undo, size: 18),
+            label: const Text('Undo'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              final v = ref.read(selectedVariantProvider);
+              if (v.id == 'horde') {
+                ref
+                    .read(pendingHordeSideSelectionProvider.notifier)
+                    .set(true);
+              } else {
+                notifier.newGame(v);
+              }
+            },
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('New'),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      _buildColorToggle(ref, notifier, variant),
+      if (variant.id == 'jetan') ...[
+        const SizedBox(height: 8),
+        _buildJetanRulesInfo(gameState),
+      ],
+      const PieceInfoPanel(),
+    ];
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: _kSurface,
         borderRadius: BorderRadius.circular(14),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Turn indicator
-          _buildTurnIndicator(gameState, notifier.isAIThinking),
-          const SizedBox(height: 12),
-
-          // Three-Check counter
-          if (variant.id == 'three_check') ...[
-            _buildCheckCounter(gameState),
-            const SizedBox(height: 12),
-          ],
-
-          // 10×10 non-standard piece guide
-          if (variant.boardSize == 10) ...[
-            _buildPieceGuide(variant),
-            const SizedBox(height: 12),
-          ],
-
-          // Game result
-          if (gameState.isGameOver) ...[
-            _buildGameResult(gameState),
-            const SizedBox(height: 12),
-          ],
-
-          // Captured pieces
-          _buildCapturedPieces(gameState),
-          const SizedBox(height: 12),
-
-          // Move counter
-          Text(
-            'Move ${gameState.fullMoveNumber}',
-            style: const TextStyle(fontSize: 14, color: _kTextMuted),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 12),
-
-          // Controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              ElevatedButton.icon(
-                onPressed:
-                    gameState.moveHistory.isEmpty ? null : notifier.undoMove,
-                icon: const Icon(Icons.undo, size: 18),
-                label: const Text('Undo'),
-              ),
-              ElevatedButton.icon(
-                onPressed: () {
-                  final v = ref.read(selectedVariantProvider);
-                  if (v.id == 'horde') {
-                    ref
-                        .read(pendingHordeSideSelectionProvider.notifier)
-                        .set(true);
-                  } else {
-                    notifier.newGame(v);
-                  }
-                },
-                icon: const Icon(Icons.refresh, size: 18),
-                label: const Text('New'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-
-          // Play-as color toggle
-          _buildColorToggle(ref, notifier, variant),
-
-          // Jetan-specific rules
-          if (variant.id == 'jetan') ...[
-            const SizedBox(height: 8),
-            _buildJetanRulesInfo(gameState),
-          ],
-
-          // Selected piece info — shown inline below controls
-          const PieceInfoPanel(),
-        ],
+      // LayoutBuilder lets us detect the landscape (bounded) vs portrait
+      // (unbounded — inside an outer SingleChildScrollView) case.
+      // Landscape splits top-fixed / bottom-scrollable so the full piece
+      // guide is always visible; portrait lets the outer scroll handle it.
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.hasBoundedHeight) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ...topChildren,
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: bottomChildren,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [...topChildren, ...bottomChildren],
+          );
+        },
       ),
     );
   }
@@ -260,57 +272,52 @@ class ScorePanel extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 6),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 200),
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: nonStandard.map((e) {
-                final info = e.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8, top: 2),
-                        child: PieceWidget(
-                          piece: _DisplayPiece(
-                            symbol: e.key, // Use map key (actual piece symbol), not display symbol
-                            color: PieceColor.white,
-                          ),
-                          size: 24,
-                          pieceSet: variant.pieceSet,
-                        ),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: nonStandard.map((e) {
+            final info = e.value;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8, top: 2),
+                    child: PieceWidget(
+                      piece: _DisplayPiece(
+                        symbol: e.key, // Use map key (actual piece symbol), not display symbol
+                        color: PieceColor.white,
                       ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              info.name,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: _kTextPrimary,
-                              ),
-                            ),
-                            Text(
-                              info.movementDescription,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: _kTextMuted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      size: 24,
+                      pieceSet: variant.pieceSet,
+                    ),
                   ),
-                );
-              }).toList(),
-            ),
-          ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          info.name,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _kTextPrimary,
+                          ),
+                        ),
+                        Text(
+                          info.movementDescription,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: _kTextMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
         ),
         const Divider(height: 1, color: Color(0xFF4A5568)),
       ],
