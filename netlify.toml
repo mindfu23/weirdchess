@@ -6,6 +6,13 @@
 [build.environment]
   SECRETS_SCAN_OMIT_KEYS = "APP_SECRET_TOKEN"
 
+# Missing assets should 404, not fall through to the SPA redirect.
+# Otherwise rootBundle.load() on web gets index.html back with status 200
+# and flutter_svg throws "Invalid SVG data".
+[[redirects]]
+  from = "/assets/*"
+  status = 404
+
 # Redirects for SPA routing (exclude static assets and functions)
 [[redirects]]
   from = "/*"

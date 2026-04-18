@@ -1,6 +1,6 @@
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart' show AssetManifest, rootBundle;
 import 'package:flutter_svg/flutter_svg.dart';
 import '../../core/piece.dart';
 
@@ -71,19 +71,25 @@ String? _pieceAssetPath(Piece piece, {String set = 'standard'}) {
 /// Cache which asset paths exist and in which format.
 final Map<String, String?> _assetFormatCache = {};
 
-/// Check if an asset exists, with caching.
+// Consult the AssetManifest directly. On Flutter web, rootBundle.load() is just
+// an HTTP fetch with no existence check — under Netlify's SPA fallback a missing
+// asset returns index.html with status 200, which downstream parses as invalid SVG.
+Future<Set<String>>? _manifestFuture;
+Future<Set<String>> _loadManifest() {
+  return _manifestFuture ??= AssetManifest.loadFromAssetBundle(rootBundle)
+      .then((m) => m.listAssets().toSet());
+}
+
 Future<String?> _resolveAssetFormat(String basePath) async {
   if (_assetFormatCache.containsKey(basePath)) {
     return _assetFormatCache[basePath];
   }
-  // Try SVG first, then PNG
+  final assets = await _loadManifest();
   for (final ext in ['.svg', '.png']) {
-    try {
-      await rootBundle.load('$basePath$ext');
-      _assetFormatCache[basePath] = '$basePath$ext';
-      return '$basePath$ext';
-    } catch (_) {
-      // Asset doesn't exist in this format
+    final candidate = '$basePath$ext';
+    if (assets.contains(candidate)) {
+      _assetFormatCache[basePath] = candidate;
+      return candidate;
     }
   }
   _assetFormatCache[basePath] = null;
