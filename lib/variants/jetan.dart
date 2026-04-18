@@ -131,13 +131,13 @@ Win by capturing the opponent's Chief or reaching their back rank with your Prin
           name: 'Chief',
           symbol: 'Cf',
           value: 10000,
-          movementDescription: 'Moves up to 3 squares in any direction. Capture ends the game.',
+          movementDescription: 'Like a King but moves up to 3 squares in any direction. Capture ends the game.',
         ),
         'Pr': const PieceInfo(
           name: 'Princess',
           symbol: 'Pr',
           value: 9,
-          movementDescription: 'Moves up to 3 squares in any direction. Reaching enemy back rank wins.',
+          movementDescription: 'Like a Queen but moves up to 3 squares in any direction. Reaching enemy back rank wins.',
         ),
         'Fl': const PieceInfo(
           name: 'Flier',
