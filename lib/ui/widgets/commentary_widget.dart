@@ -1,7 +1,78 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../services/llm_service.dart';
 import '../../services/auth_service.dart';
+
+const _reportEmail = 'mindfumedia+weirdchess@gmail.com';
+
+String _pctEncode(String s) =>
+    Uri.encodeQueryComponent(s).replaceAll('+', '%20');
+
+Future<void> _reportCommentary(BuildContext context, String text) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Report AI commentary'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'If this AI-generated commentary is offensive, misleading, '
+            'or otherwise inappropriate, tap Send to open your email app '
+            'with a pre-filled report. Add a brief note about what was '
+            'wrong and send.',
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(ctx).colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '"$text"',
+              style: const TextStyle(fontStyle: FontStyle.italic, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(ctx).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(ctx).pop(true),
+          child: const Text('Send report'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true || !context.mounted) return;
+
+  final body = 'I want to report the following AI-generated commentary '
+      'from WeirdChess as inappropriate:\n\n'
+      '---\n'
+      '"$text"\n'
+      '---\n\n'
+      'Reason / additional context:\n';
+
+  final uri = Uri.parse(
+    'mailto:$_reportEmail'
+    '?subject=${_pctEncode("WeirdChess: AI commentary report")}'
+    '&body=${_pctEncode(body)}',
+  );
+
+  final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+  if (!launched && context.mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Could not open email — write to $_reportEmail')),
+    );
+  }
+}
 
 /// Speech bubble widget that displays AI commentary on moves.
 /// Positioned above the chess board with a tail pointing downward.
@@ -103,6 +174,25 @@ class CommentarySpeechBubble extends ConsumerWidget {
               ),
             ),
           ),
+          if (!isError) ...[
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: () => _reportCommentary(context, commentary.text),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.flag_outlined,
+                  size: 18,
+                  semanticLabel: 'Report commentary',
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onPrimaryContainer
+                      .withAlpha(160),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -243,6 +333,23 @@ class CommentaryBanner extends ConsumerWidget {
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          if (!commentary.isLoading && !commentary.isError)
+            InkWell(
+              onTap: () => _reportCommentary(context, commentary.text),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Icon(
+                  Icons.flag_outlined,
+                  size: 16,
+                  semanticLabel: 'Report commentary',
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onPrimaryContainer
+                      .withAlpha(160),
+                ),
+              ),
+            ),
         ],
       ),
     );

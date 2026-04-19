@@ -62,6 +62,14 @@ A Flutter chess app with 12 playable variants — 7 on a standard 8×8 board and
 - Configurable via Settings — API key, provider, model, and enable/disable toggle
 - Default model: `claude-3-haiku-20240307` (~$0.006 per 40-move game at standard pricing)
 
+### Reporting AI-generated content
+Every non-error commentary bubble shows a flag icon. Tapping it opens a confirmation dialog with the quoted text and a **Send report** button that launches the user's email app, pre-addressed to `mindfumedia+weirdchess@gmail.com` with the offending commentary and a blank "reason" field pre-filled in the body.
+
+- Complies with Google Play's AI-Generated Content policy (in-app reporting mechanism required for all generative-AI apps)
+- The `+weirdchess` alias makes routing/filtering in Gmail straightforward and revocable without shipping an app update
+- Report channel is configured in [lib/ui/widgets/commentary_widget.dart](lib/ui/widgets/commentary_widget.dart) — swap the `_reportEmail` constant to change it
+- Scaling path when volume grows: replace the `mailto:` with a POST to a Netlify Function that writes reports to a Google Sheet or Supabase table (the in-app UI stays the same)
+
 ### Navigation
 - Home screen with separate **8×8 Variants** and **10×10 Variants** tabs
 - Back button from the game screen returns to the correct tab (8×8 or 10×10) based on the active variant
