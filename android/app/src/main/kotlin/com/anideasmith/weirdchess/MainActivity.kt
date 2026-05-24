@@ -1,4 +1,4 @@
-package com.example.weirdchess
+package com.anideasmith.weirdchess
 
 import io.flutter.embedding.android.FlutterActivity
 
