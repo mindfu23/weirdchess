@@ -9,8 +9,15 @@
 # Missing assets should 404, not fall through to the SPA redirect.
 # Otherwise rootBundle.load() on web gets index.html back with status 200
 # and flutter_svg throws "Invalid SVG data".
+#
+# `to` is REQUIRED. Without it Netlify rejects the rule with
+# `Missing "to" field` and silently drops it — which is how this sat broken:
+# the comment above described a fix that was never in effect.
+# A non-forced redirect is shadowed by a real file, so assets that exist are
+# still served normally and only missing ones reach this rule.
 [[redirects]]
   from = "/assets/*"
+  to = "/404.html"
   status = 404
 
 # Health endpoint — must precede the SPA catch-all, otherwise /api/health
