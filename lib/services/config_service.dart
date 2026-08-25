@@ -26,14 +26,32 @@ extension LlmProviderExtension on LlmProvider {
   String get defaultModel {
     switch (this) {
       case LlmProvider.anthropic:
-        return 'claude-3-haiku-20240307';
+        return 'claude-haiku-4-5-20251001';
       case LlmProvider.openai:
         return 'gpt-4o-mini';
       case LlmProvider.google:
-        return 'gemini-1.5-flash';
+        return 'gemini-2.5-flash';
     }
   }
 }
+
+/// Model ids that providers have retired, mapped to their replacement.
+///
+/// A model id saved in SharedPreferences outlives an app update, so without
+/// this remap a user who ever picked a model keeps sending a dead id and every
+/// commentary call fails.  Add a row whenever a model is retired.
+const Map<String, String> kRetiredModels = {
+  'claude-3-haiku-20240307': 'claude-haiku-4-5-20251001',
+  'claude-3-5-haiku-20241022': 'claude-haiku-4-5-20251001',
+  'claude-3-sonnet-20240229': 'claude-sonnet-4-5-20250929',
+  'claude-3-opus-20240229': 'claude-opus-4-1-20250805',
+  'gemini-1.5-flash': 'gemini-2.5-flash',
+  'gemini-1.5-pro': 'gemini-2.5-pro',
+  'gemini-2.0-flash': 'gemini-2.5-flash',
+};
+
+/// Returns the live replacement for [model] if it has been retired.
+String resolveRetiredModel(String model) => kRetiredModels[model] ?? model;
 
 /// Configuration for the app, loaded from local file or environment.
 class AppConfig {
@@ -92,7 +110,7 @@ class AppConfig {
         orElse: () => LlmProvider.anthropic,
       );
       if (entry.value is String && (entry.value as String).isNotEmpty) {
-        models[p] = entry.value as String;
+        models[p] = resolveRetiredModel(entry.value as String);
       }
     }
 
@@ -180,7 +198,12 @@ class ConfigService {
         for (final p in LlmProvider.values) {
           final model = prefs.getString('$_prefsKeyModelPrefix${p.name}');
           if (model != null && model.isNotEmpty) {
-            models[p] = model;
+            final live = resolveRetiredModel(model);
+            models[p] = live;
+            if (live != model) {
+              // Rewrite the stale id so the migration only happens once.
+              await prefs.setString('$_prefsKeyModelPrefix${p.name}', live);
+            }
           }
         }
 

@@ -13,6 +13,14 @@
   from = "/assets/*"
   status = 404
 
+# Health endpoint — must precede the SPA catch-all, otherwise /api/health
+# falls through to index.html and returns 200 with HTML, which reads as "up"
+# to a plain uptime monitor while every real check is silently skipped.
+[[redirects]]
+  from = "/api/health"
+  to = "/.netlify/functions/health"
+  status = 200
+
 # Redirects for SPA routing (exclude static assets and functions)
 [[redirects]]
   from = "/*"

@@ -40,7 +40,7 @@ class LlmConfig {
     this.baseUrl = '/.netlify/functions',
     this.endpoint = '/chess-commentary',
     this.provider = LlmProvider.anthropic,
-    this.model = 'claude-3-haiku-20240307',
+    this.model = 'claude-haiku-4-5-20251001',
     this.enabled = true,
     this.directMode = true,
     this.maxRetries = 3,
