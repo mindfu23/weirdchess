@@ -4,6 +4,7 @@
   functions = "netlify/functions"
 
 [build.environment]
+  NODE_VERSION = "20"
   SECRETS_SCAN_OMIT_KEYS = "APP_SECRET_TOKEN"
 
 # Missing assets should 404, not fall through to the SPA redirect.
@@ -34,13 +35,9 @@
   to = "/index.html"
   status = 200
 
-# Headers for CORS
-[[headers]]
-  for = "/.netlify/functions/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "*"
-    Access-Control-Allow-Headers = "Content-Type, Authorization"
-    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
+# No blanket CORS for functions. chess-commentary sets
+# Access-Control-Allow-Origin itself, only for https://weirdchess.netlify.app
+# (and its deploy previews); mobile clients send no Origin and need none.
 
 # Development settings
 [dev]

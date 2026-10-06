@@ -1,0 +1,14 @@
+{
+  "name": "weirdchess-functions",
+  "private": true,
+  "description": "Netlify Functions dependencies only. The app itself is Flutter (see pubspec.yaml).",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@netlify/blobs": "8.2.0"
+  },
+  "devDependencies": {
+    "@netlify/functions": "^5.0.0"
+  }
+}

@@ -2,7 +2,11 @@
  * Health Check — WeirdChess
  *
  * GET /api/health          → cheap checks (frontend, model-liveness, key validity)
- * GET /api/health?deep=1   → additionally makes one real commentary round-trip
+ * GET /api/health?deep=1   → additionally makes one real (paid) commentary round-trip.
+ *                            Requires header X-Health-Secret matching the
+ *                            HEALTH_DEEP_SECRET env var; otherwise 403 and no
+ *                            paid call is made. If HEALTH_DEEP_SECRET is unset,
+ *                            deep checks are disabled.
  *
  * Monitored by UptimeRobot with a keyword monitor on: "status":"healthy"
  *
@@ -14,6 +18,8 @@
  * endpoint asserts that the exact model ids the app ships with still appear in
  * each provider's live model list.
  */
+
+const crypto = require('crypto');
 
 const TIMEOUT_MS = 8000;
 
@@ -105,9 +111,8 @@ async function checkCommentaryRoundTrip() {
     body: JSON.stringify({
       provider: 'anthropic',
       model: MODELS_IN_USE.anthropic,
-      personality: 'You are a terse chess commentator.',
-      prompt: 'White opens with e4. Reply in under ten words.',
-      variantId: 'health-check',
+      prompt: 'White played: Pawn from e2 to e4. Reply in under ten words.',
+      variantId: 'standard_chess',
     }),
   });
   const text = await res.text();
@@ -119,9 +124,28 @@ async function checkCommentaryRoundTrip() {
   return data.commentary.slice(0, 60);
 }
 
+/** Constant-time check of the X-Health-Secret header against HEALTH_DEEP_SECRET. */
+function deepAuthorized(event) {
+  const expected = process.env.HEALTH_DEEP_SECRET;
+  if (!expected) return false;
+  const sent = event.headers?.['x-health-secret'] || event.headers?.['X-Health-Secret'] || '';
+  const a = crypto.createHash('sha256').update(String(sent)).digest();
+  const b = crypto.createHash('sha256').update(expected).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
 exports.handler = async (event) => {
   const deep = event.queryStringParameters?.deep === '1';
   const start = Date.now();
+
+  // The deep check spends real AI credit: never run it for an anonymous caller.
+  if (deep && !deepAuthorized(event)) {
+    return {
+      statusCode: 403,
+      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+      body: JSON.stringify({ status: 'forbidden', app: APP_NAME, error: 'deep=1 requires X-Health-Secret' }),
+    };
+  }
 
   const checks = [
     { name: 'frontend', run: checkFrontend },
@@ -167,7 +191,6 @@ exports.handler = async (event) => {
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Access-Control-Allow-Origin': '*',
     },
     body: JSON.stringify(
       {

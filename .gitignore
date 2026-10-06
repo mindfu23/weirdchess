@@ -60,3 +60,6 @@ android/app/*.keystore
 # Claude Code
 .claude/
 CLAUDE.md
+
+# Netlify Functions dependencies
+node_modules/
